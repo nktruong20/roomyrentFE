@@ -1,0 +1,48 @@
+/* Input % hoa hồng */
+input[name="commission_percent"] {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 15px;
+  background: #f9fafb;
+  transition: all 0.3s ease;
+  color: #111827;
+}
+input[name="commission_percent"]:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.25);
+  background: #ffffff;
+  animation: pulseField 0.4s ease;
+}
+
+/* Mô tả bên phải */
+textarea[name="description"] {
+  min-height: 120px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #111827;
+  transition: all 0.3s ease;
+  resize: vertical;
+}
+textarea[name="description"]:focus {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139,92,246,0.25);
+  background: #ffffff;
+  animation: fadeInUp 0.4s ease;
+}
+
+/* Animation cho input focus */
+@keyframes pulseField {
+  0% { transform: scale(0.98); opacity: 0.9; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Animation fadeInUp */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
