@@ -10,6 +10,8 @@ import Swal from "sweetalert2";
 import { createSchedule, getMySchedules } from "../services/scheduleService";
 import { getRoomById } from "../services/roomService";
 import { getMe } from "../services/authService";
+import RelatedRooms from "../components/RelatedRooms";
+
 import {
   addFavourite,
   removeFavourite,
@@ -196,57 +198,60 @@ export default function DetailRoom() {
   // ===== Form
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!isLoggedIn) {
-      Swal.fire({
-        icon: "warning",
-        title: "Vui lòng đăng nhập!",
-        text: "Bạn cần đăng nhập để tiếp tục.",
-        confirmButtonText: "Đến đăng nhập",
-        confirmButtonColor: "#7c3aed",
-      }).then((r) => r.isConfirmed && navigate("/login"));
-      return;
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!isLoggedIn) {
+    Swal.fire({
+      icon: "warning",
+      title: "Vui lòng đăng nhập!",
+      text: "Bạn cần đăng nhập để tiếp tục.",
+      confirmButtonText: "Đến đăng nhập",
+      confirmButtonColor: "#7c3aed",
+    }).then((r) => r.isConfirmed && navigate("/login"));
+    return;
+  }
+
+  try {
+    const u = await getMe();
+
+    let start_time = null;
+    let end_time = null;
+
+    if (form.date && form.time) {
+      const [h, m] = form.time.split(":");
+      const d = new Date(form.date);
+      d.setHours(h, m);
+      start_time = d.toISOString();
+
+      // ✅ Tự động cộng 1h30p
+      const end = new Date(d.getTime() + 90 * 60000);
+      end_time = end.toISOString();
     }
 
-    try {
-      const u = await getMe();
-      let scheduled_time = null;
-      if (form.date && form.time) {
-        const [h, m] = form.time.split(":");
-        const d = new Date(form.date);
-        d.setHours(h, m);
-        scheduled_time = d.toISOString();
-      }
-      await createSchedule({
-        room_id: id,
-        customer_name: form.name,
-        customer_phone: form.phone,
-        scheduled_time,
-        note: form.note,
-        create_by: u?._id,
-      });
+    await createSchedule({
+      room_id: id,
+      customer_name: form.name,
+      customer_email: form.email,   // 👈 thêm email
+      customer_phone: form.phone,
+      start_time,
+      end_time,
+      note: form.note,
+      create_by: u?._id,
+    });
 
-      Swal.fire({
-        icon: "success",
-        title: "Đặt lịch thành công!",
-        text: "Bạn đã đặt lịch xem phòng thành công.",
-        confirmButtonText: "OK",
-        confirmButtonColor: "#7c3aed",
-      });
-      setHasBooked(true);
-      setShowModal(false);
-    } catch (err) {
-      console.error("❌ createSchedule:", err);
-      Swal.fire({
-        icon: "error",
-        title: "Lỗi đặt lịch",
-        text: err?.error || "Không thể đặt lịch, vui lòng thử lại.",
-        confirmButtonText: "OK",
-        confirmButtonColor: "#7c3aed",
-      });
-    }
-  };
+    Swal.fire({
+      icon: "success",
+      title: "Đặt lịch thành công!",
+      text: "Bạn đã đặt lịch xem phòng thành công.",
+      confirmButtonText: "OK",
+      confirmButtonColor: "#7c3aed",
+    });
+    setHasBooked(true);
+    setShowModal(false);
+  } catch (err) {
+    Swal.fire("Lỗi", err?.error || "Không thể đặt lịch, vui lòng thử lại", "error");
+  }
+};
 
   const togglePhoneVisibility = () => {
     if (!isLoggedIn) {
@@ -568,15 +573,16 @@ export default function DetailRoom() {
               📧 {room.create_by?.email || "contact@roomyrent.vn"}
             </div>
 
-           {room.status === "Đã thuê" ? (
+              {room.status === "đã thuê" ? (
   <button style={styles.rentedBtn} disabled>
-    🔒 Phòng đang được thuê
+     Phòng đã có người thuê
   </button>
 ) : (
   <button style={styles.ctaBtn} onClick={handleBookRoom}>
     Đặt lịch xem phòng
   </button>
 )}
+
 
           </div>
 
@@ -587,136 +593,126 @@ export default function DetailRoom() {
       {showModal && (
         <div style={styles.modalOverlay}>
           <div style={styles.modal}>
-            <h2 style={styles.modalTitle}>Đặt lịch xem phòng</h2>
-            <button
-              style={styles.closeBtn}
-              onClick={() => setShowModal(false)}
-              className="close-btn"
-            >
-              <FaTimes />
-            </button>
+  <h2 style={styles.modalTitle}>📅 Đặt lịch xem phòng</h2>
+  <button style={styles.closeBtn} onClick={() => setShowModal(false)}>
+    <FaTimes />
+  </button>
 
-            {hasBooked && (
-              <div
-                style={{
-                  padding: 12,
-                  borderRadius: 10,
-                  background: "#ecfdf5",
-                  border: "1px solid #86efac",
-                  color: "#16a34a",
-                  fontWeight: 600,
-                  textAlign: "center",
-                }}
-              >
-                ✅ Bạn đã đặt lịch phòng này rồi. Xem tại{" "}
-                <a
-                  href="/profile"
-                  style={{ color: "#16a34a", textDecoration: "underline" }}
-                >
-                  hồ sơ cá nhân
-                </a>
-                .
-              </div>
-            )}
+  {hasBooked && (
+    <div style={styles.alertBooked}>
+      ✅ Bạn đã đặt lịch phòng này rồi. Xem tại{" "}
+      <a href="/profile" style={styles.alertLink}>hồ sơ cá nhân</a>.
+    </div>
+  )}
 
-            <form style={styles.form} onSubmit={handleSubmit}>
-              <div style={styles.inputGroup}>
-                <FaUser style={styles.icon} />
-                <input
-                  type="text"
-                  name="name"
-                  placeholder="Họ và tên"
-                  value={form.name}
-                  onChange={handleChange}
-                  style={styles.input}
-                  required
-                />
-              </div>
+<form style={styles.form} onSubmit={handleSubmit}>
+  <div style={styles.inputGroup}>
+    <FaUser style={styles.icon} />
+    <input
+      type="text"
+      name="name"
+      placeholder="Họ và tên"
+      value={form.name}
+      onChange={handleChange}
+      style={styles.input}
+      required
+    />
+  </div>
 
-              <div style={styles.inputGroup}>
-                <FaEnvelope style={styles.icon} />
-                <input
-                  type="email"
-                  name="email"
-                  placeholder="Email"
-                  value={form.email}
-                  onChange={handleChange}
-                  style={styles.input}
-                  required
-                />
-              </div>
+  <div style={styles.inputGroup}>
+    <FaEnvelope style={styles.icon} />
+    <input
+      type="email"
+      name="email"
+      placeholder="Email"
+      value={form.email}
+      onChange={handleChange}
+      style={styles.input}
+      required
+    />
+  </div>
 
-              <div style={styles.inputGroup}>
-                <FaPhone style={styles.icon} />
-                <input
-                  type="tel"
-                  name="phone"
-                  placeholder="Số điện thoại"
-                  value={form.phone}
-                  onChange={handleChange}
-                  style={styles.input}
-                  required
-                />
-              </div>
+  <div style={styles.inputGroup}>
+    <FaPhone style={styles.icon} />
+    <input
+      type="tel"
+      name="phone"
+      placeholder="Số điện thoại"
+      value={form.phone}
+      onChange={handleChange}
+      style={styles.input}
+      required
+    />
+  </div>
 
-              <div style={styles.inputGroup}>
-                <FaMapMarkerAlt style={styles.icon} />
-                <input
-                  type="text"
-                  name="address"
-                  placeholder="Địa chỉ"
-                  value={form.address}
-                  onChange={handleChange}
-                  style={styles.input}
-                />
-              </div>
+  <div style={styles.inputGroup}>
+    <FaMapMarkerAlt style={styles.icon} />
+    <input
+      type="text"
+      name="address"
+      placeholder="Địa chỉ"
+      value={form.address}
+      onChange={handleChange}
+      style={styles.input}
+    />
+  </div>
 
-              <div style={styles.inputGroup}>
-                <FaCalendarAlt style={styles.icon} />
-                <DatePicker
-                  selected={form.date}
-                  onChange={(date) => setForm({ ...form, date })}
-                  placeholderText="Chọn ngày"
-                />
-              </div>
+  <div style={styles.inputGroup}>
+    <FaCalendarAlt style={styles.icon} />
+    <DatePicker
+      selected={form.date}
+      onChange={(date) => setForm({ ...form, date })}
+      placeholderText="Chọn ngày"
+    />
+  </div>
 
-              <div style={styles.inputGroup}>
-                <FaClock style={styles.icon} />
-                <input
-                  type="time"
-                  name="time"
-                  value={form.time}
-                  onChange={handleChange}
-                  style={styles.input}
-                />
-              </div>
+  <div style={styles.inputGroup}>
+    <FaClock style={styles.icon} />
+    <input
+      type="time"
+      name="time"
+      value={form.time}
+      onChange={handleChange}
+      style={styles.input}
+    />
+  </div>
 
-              <div style={styles.textareaGroup}>
-                <textarea
-                  name="note"
-                  placeholder="Ghi chú thêm..."
-                  value={form.note}
-                  onChange={handleChange}
-                  style={styles.textarea}
-                />
-              </div>
+  <div style={styles.textareaGroup}>
+    <textarea
+      name="note"
+      placeholder="Ghi tên + SĐT khách hàng"
+      value={form.note}
+      onChange={handleChange}
+      style={styles.textarea}
+    />
+  </div>
 
-              <div style={styles.modalActions}>
-                <button
-                  type="button"
-                  style={styles.cancelBtn}
-                  onClick={() => setShowModal(false)}
-                >
-                  Hủy
-                </button>
-                <button type="submit" style={styles.confirmBtn}>
-                  Xác nhận
-                </button>
-              </div>
-            </form>
-          </div>
+  <div style={styles.modalActions}>
+    <button
+      type="button"
+      style={styles.cancelBtn}
+      onClick={() => setShowModal(false)}
+    >
+      Hủy
+    </button>
+    <button type="submit" style={styles.confirmBtn}>
+      Xác nhận
+    </button>
+  </div>
+</form>
+
+</div>
+
         </div>
       )}
+<RelatedRooms
+  districtCode={room?.district?.code}
+  districtName={room?.district?.name}
+  excludeId={room?._id}
+/>
+
+
+
 
       <Footer />
       <StyleTag />
@@ -979,22 +975,34 @@ const styles = {
   amenityText: { fontSize: "16px", color: "#333", fontWeight: "500" },
   serviceLabel: { fontSize: "16px", color: "#555" },
   serviceValue: { fontSize: "16px", color: "#7c3aed", fontWeight: "600" },
-  rentedBtn: {
+rentedBtn: {
   marginTop: "12px",
   width: "100%",
   padding: "12px 0",
   borderRadius: "10px",
   border: "none",
-  background: "#dc4e41", // xám nhạt → xám đậm
-  color: "#fff",
+  background: "linear-gradient(90deg,#facc15,#fbbf24)", // vàng dịu
+  color: "#78350f", // nâu đậm
   fontSize: "16px",
   fontWeight: "600",
   cursor: "not-allowed",
   letterSpacing: "0.3px",
-  boxShadow: "0 4px 12px rgba(107,114,128,0.4)",
-  animation: "softPulse 2s infinite ease-in-out",
+  boxShadow: "0 4px 12px rgba(250,204,21,0.4)",
   transition: "all .3s ease",
-}
+},
+
+alertBooked: {
+  padding: "12px",
+  borderRadius: "10px",
+  background: "#ecfdf5",
+  border: "1px solid #86efac",
+  color: "#16a34a",
+  fontWeight: 600,
+  textAlign: "center",
+  marginBottom: "10px",
+},
+alertLink: { color: "#16a34a", textDecoration: "underline" },
+
 
 
 };

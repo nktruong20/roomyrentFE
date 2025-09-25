@@ -53,7 +53,7 @@ export default function RegisterManagement() {
         icon: "success",
         title: "Đăng ký thành công!",
         confirmButtonText: "Đóng",
-      }).then(() => navigate("/login"));
+      }).then(() => navigate("/admin/staff"));
     } catch (error) {
       setErrorMessage(error);
       Swal.fire({

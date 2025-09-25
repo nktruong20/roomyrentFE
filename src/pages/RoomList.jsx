@@ -5,18 +5,20 @@ import Footer from "../components/Footer";
 import StudentRoom from "../components/StudentRoom";
 import BannerCarousel from "../components/BannerCarousel";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPhone, faHeart, faSearch, faChevronDown, faTimes } from "@fortawesome/free-solid-svg-icons";
-import { motion, AnimatePresence } from "framer-motion";
+import { faPhone, faHeart } from "@fortawesome/free-solid-svg-icons";
+import { motion } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 import Swal from "sweetalert2";
-import { getRooms } from "../services/roomService"; // ✅ gọi API
-import { addFavourite, removeFavourite, getFavouritesByUser } from "../services/favouriteService";
+import { getRooms } from "../services/roomService";
+import {
+  addFavourite,
+  removeFavourite,
+  getFavouritesByUser,
+} from "../services/favouriteService";
 import { getMe } from "../services/authService";
 
-
-
 export default function RoomList() {
-  const [rooms, setRooms] = useState([]); // ✅ dữ liệu từ API
+  const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [filters, setFilters] = useState({
@@ -32,35 +34,39 @@ export default function RoomList() {
     maxArea: "",
   });
 
-  const [openDropdown, setOpenDropdown] = useState(null);
   const [visiblePhones, setVisiblePhones] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [favourites, setFavourites] = useState({});
   const [user, setUser] = useState(null);
-  
-
 
   const { ref, inView } = useInView({ triggerOnce: true, threshold: 0.2 });
   const navigate = useNavigate();
-  const topRef = useRef(null);
+  const listRef = useRef(null); // 👉 để scroll xuống danh sách
 
+  // Rút gọn địa chỉ hiển thị
+  const shortAddress = (address) => {
+    if (!address) return "";
+    const parts = address.split(",");
+    let result = parts.slice(-2).join(",").trim();
+    result = result.replace(/Thành phố\s+/gi, "");
+    result = result.replace(/Tỉnh\s+/gi, "");
+    return result;
+  };
 
+  // Lấy user
   useEffect(() => {
     const fetchUser = async () => {
       try {
         const data = await getMe();
         setUser(data);
-      } catch (err) {
+      } catch {
         setUser(null);
       }
     };
     fetchUser();
   }, []);
-  
-  
 
-  // ✅ Gọi API lấy rooms
+  // Lấy danh sách rooms
   useEffect(() => {
     const fetchRooms = async () => {
       try {
@@ -74,36 +80,29 @@ export default function RoomList() {
     };
     fetchRooms();
   }, []);
-
-  // scroll
-  useEffect(() => {
-    window.scrollTo({ top: 550, behavior: "smooth" });
-  }, [currentPage]);
-
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
-  // Khi đã có user => load danh sách yêu thích
 useEffect(() => {
-  const fetchFavourites = async () => {
-    if (!user) return;
-    try {
-      const favs = await getFavouritesByUser(user._id);
-      // map thành { roomId: favouriteId }
-      const favMap = {};
-      favs.forEach((f) => {
-        favMap[f.room_id._id] = f._id;
-      });
-      setFavourites(favMap);
-    } catch (err) {
-      console.error("❌ Lỗi khi lấy favourites:", err);
-    }
-  };
-  fetchFavourites();
-}, [user]);
+  window.scrollTo({ top: 600, behavior: "smooth" });
+}, [currentPage]);
 
+  // Lấy danh sách yêu thích khi có user
+  useEffect(() => {
+    const fetchFavourites = async () => {
+      if (!user) return;
+      try {
+        const favs = await getFavouritesByUser(user._id);
+        const favMap = {};
+        favs.forEach((f) => {
+          favMap[f.room_id._id] = f._id;
+        });
+        setFavourites(favMap);
+      } catch (err) {
+        console.error("❌ Lỗi khi lấy favourites:", err);
+      }
+    };
+    fetchFavourites();
+  }, [user]);
 
-
+  // Hiện số điện thoại
   const togglePhone = (roomId, phone) => {
     if (!user) {
       Swal.fire({
@@ -119,7 +118,8 @@ useEffect(() => {
       setVisiblePhones((prev) => ({ ...prev, [roomId]: !prev[roomId] }));
     }
   };
-  
+
+  // Thêm / Xóa yêu thích
   const toggleFavourite = async (roomId) => {
     if (!user) {
       Swal.fire({
@@ -133,7 +133,7 @@ useEffect(() => {
       });
       return;
     }
-  
+
     try {
       if (favourites[roomId]) {
         await removeFavourite(favourites[roomId]);
@@ -144,8 +144,7 @@ useEffect(() => {
         });
         Swal.fire("Đã xóa", "Bỏ phòng khỏi yêu thích", "success");
       } else {
-        console.log("📤 Gửi room_id lên API:", roomId); // debug
-        const res = await addFavourite(roomId); // ✅ sửa chỗ này
+        const res = await addFavourite(roomId);
         setFavourites((prev) => ({ ...prev, [roomId]: res._id }));
         Swal.fire("Thành công", "Đã thêm phòng vào yêu thích", "success");
       }
@@ -154,47 +153,86 @@ useEffect(() => {
       Swal.fire("Lỗi", err.message || "Không thể xử lý yêu thích", "error");
     }
   };
-  
-  
-  
 
   // FILTER logic
   const filteredRooms = useMemo(() => {
     return rooms.filter((room) => {
-      const { minPrice, maxPrice, type, city, district, wards, minArea, maxArea, keyword } = filters;
-      if (keyword && !room.address?.toLowerCase().includes(keyword.toLowerCase())) return false;
-      if (minPrice && room.price < parseInt(minPrice)) return false;
-      if (maxPrice && room.price > parseInt(maxPrice)) return false;
-      if (minArea && room.area < parseInt(minArea)) return false;
-      if (maxArea && room.area > parseInt(maxArea)) return false;
+      const {
+        minPrice,
+        maxPrice,
+        type,
+        city,
+        district,
+        wards,
+        minArea,
+        maxArea,
+        keyword,
+      } = filters;
+
+      if (keyword && !room.address?.toLowerCase().includes(keyword.toLowerCase()))
+        return false;
+      if (minPrice && room.price < Number(minPrice)) return false;
+      if (maxPrice && room.price > Number(maxPrice)) return false;
+      if (minArea && room.area < Number(minArea)) return false;
+      if (maxArea && room.area > Number(maxArea)) return false;
       if (type && room.type !== type) return false;
       if (city && !room.address?.includes(city)) return false;
       if (district && !room.address?.includes(district)) return false;
-      if (wards.length > 0 && !wards.some((w) => room.address?.includes(w))) return false;
+      if (wards.length > 0 && !wards.some((w) => room.address?.includes(w)))
+        return false;
+
       return true;
     });
   }, [filters, rooms]);
 
-  // PAGINATION
+  // Pagination
   const cardsPerPage = 12;
   const totalPages = Math.ceil(filteredRooms.length / cardsPerPage);
   const startIndex = (currentPage - 1) * cardsPerPage;
-  const paginatedRooms = filteredRooms.slice(startIndex, startIndex + cardsPerPage);
+  const paginatedRooms = filteredRooms.slice(
+    startIndex,
+    startIndex + cardsPerPage
+  );
 
-  if (loading) return <p style={{ padding: "40px" }}>⏳ Đang tải dữ liệu...</p>;
+  // Khi bấm tìm kiếm ở BannerCarousel → scroll tới list
+  const handleSearch = (filterValues) => {
+    setFilters((prev) => ({ ...prev, ...filterValues }));
+    setTimeout(() => {
+      if (listRef.current) {
+        const yOffset = -120; // 👉 chỉnh khoảng trống stop
+        const y =
+          listRef.current.getBoundingClientRect().top +
+          window.pageYOffset +
+          yOffset;
+        window.scrollTo({ top: y, behavior: "smooth" });
+      }
+    }, 300);
+  };
+
+  if (loading)
+    return <p style={{ padding: "40px" }}>⏳ Đang tải dữ liệu...</p>;
 
   return (
     <div style={{ paddingTop: 80 }}>
       <Header />
       <div style={styles.page}>
-        <BannerCarousel />
-        {/* ===== Filter bar giữ nguyên ===== */}
-        
-        <p style={{ fontSize: "28px", fontWeight: "780" }}>Danh sách căn hộ đang mở cho thuê</p>
-        <div ref={topRef} style={styles.grid}>
+        {/* ✅ Nhận filter từ BannerCarousel */}
+        <BannerCarousel onSearch={handleSearch} />
+
+        <motion.p
+          style={{ fontSize: "28px", fontWeight: "780", marginBottom: "20px" }}
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+        >
+          Danh sách căn hộ đang mở cho thuê
+        </motion.p>
+
+        <div ref={listRef} style={styles.grid}>
           {paginatedRooms.map((room, index) => {
             const phoneVisible = visiblePhones[room._id];
-            const maskedPhone = room.create_by?.phone?.slice(0, 7) + " ..." || "Ẩn số";
+            const maskedPhone =
+              room.create_by?.phone?.slice(0, 7) + " ..." || "Ẩn số";
             const isFav = favourites[room._id];
             return (
               <motion.div
@@ -204,35 +242,55 @@ useEffect(() => {
                 initial={{ opacity: 0, y: 40 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
+                whileHover={{
+                  scale: 1.03,
+                  boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
+                }}
               >
                 <div style={styles.imageWrapper}>
-                  <img src={room.images?.[0]?.url} alt={room.name} style={styles.image} />
-                  <div style={styles.priceTag}>{room.price.toLocaleString()} VND/tháng</div>
+                  <img
+                    src={room.images?.[0]?.url}
+                    alt={room.name}
+                    style={styles.image}
+                  />
+                  <div style={styles.priceTag}>
+                    {room.price.toLocaleString()} VND/tháng
+                  </div>
                 </div>
                 <div style={styles.cardBody}>
-                <div style={styles.nameRow}>
-                  <h3 style={styles.roomName}>{room.apartmentName || "Không có tên"}</h3>
-                  {room.commission_percent && (
-                    <span
-                      className="commission-badge"
-                      data-tooltip={`Hoa hồng: ${(room.price * room.commission_percent / 100).toLocaleString()} VND`}
-                    >
-                      {room.commission_percent}%
-                    </span>
-                  )}
-                </div>
+                  <div style={styles.nameRow}>
+                    <h3 style={styles.roomName}>
+                      {room.apartmentName || "Không có tên"}
+                    </h3>
+                    {room.commission_percent && (
+                      <span
+                        className="commission-badge"
+                        data-tooltip={`Hoa hồng: ${(
+                          (room.price * room.commission_percent) /
+                          100
+                        ).toLocaleString()} VND`}
+                      >
+                        {room.commission_percent}%
+                      </span>
+                    )}
+                  </div>
 
                   <p style={styles.roomInfo}>
-                    {room.type} • {room.area} m² • {room.address}
+                    {room.type} • {room.area} m² • {shortAddress(room.address)}
                   </p>
+
                   <div style={styles.posterRow}>
                     <img
-                      src={room.create_by?.avatar || "https://i.pravatar.cc/50"}
+                      src={
+                        room.create_by?.avatar || "https://i.pravatar.cc/50"
+                      }
                       alt={room.create_by?.name || "Người đăng"}
                       style={styles.avatar}
                     />
                     <div>
-                      <p style={styles.posterName}>{room.create_by?.name || "Người đăng"}</p>
+                      <p style={styles.posterName}>
+                        {room.create_by?.name || "Người đăng"}
+                      </p>
                       <p style={styles.postedTime}>
                         {new Date(room.createdAt).toLocaleDateString("vi-VN")}
                       </p>
@@ -246,8 +304,13 @@ useEffect(() => {
                         togglePhone(room._id, room.create_by?.phone);
                       }}
                     >
-                      <FontAwesomeIcon icon={faPhone} style={{ marginRight: "6px" }} />
-                      {phoneVisible ? room.create_by?.phone || "Chưa có" : maskedPhone}
+                      <FontAwesomeIcon
+                        icon={faPhone}
+                        style={{ marginRight: "6px" }}
+                      />
+                      {phoneVisible
+                        ? room.create_by?.phone || "Chưa có"
+                        : maskedPhone}
                     </button>
                     <button
                       style={styles.favoriteBtn}
@@ -256,28 +319,77 @@ useEffect(() => {
                         toggleFavourite(room._id);
                       }}
                     >
-                      <FontAwesomeIcon icon={faHeart} style={{ color: isFav ? "red" : "#ccc" }} />
+                      <FontAwesomeIcon
+                        icon={faHeart}
+                        style={{ color: isFav ? "red" : "#ccc" }}
+                      />
                     </button>
                   </div>
                 </div>
               </motion.div>
             );
           })}
+
+          {/* Không tìm thấy phòng */}
           {filteredRooms.length === 0 && (
-            <p style={{ textAlign: "center", gridColumn: "1 / -1" }}>Không tìm thấy phòng phù hợp.</p>
+            <motion.div
+              style={{
+                gridColumn: "1 / -1",
+                textAlign: "center",
+                padding: "60px 20px",
+                background: "#f9fafb",
+                borderRadius: "12px",
+                boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
+              }}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6 }}
+            >
+              <div
+                style={{
+                  border: "6px solid #f3f3f3",
+                  borderTop: "6px solid #8a5cff",
+                  borderRadius: "50%",
+                  width: "50px",
+                  height: "50px",
+                  margin: "0 auto 20px",
+                  animation: "spin 1s linear infinite",
+                }}
+              />
+              <h3 style={{ fontSize: "20px", fontWeight: "700", color: "#111" }}>
+                Không tìm thấy phòng nào phù hợp
+              </h3>
+              <p style={{ fontSize: "15px", color: "#555", marginTop: "8px" }}>
+                Bạn có thể thử thay đổi bộ lọc hoặc tìm kiếm với lựa chọn khác!
+              </p>
+            </motion.div>
           )}
         </div>
 
-        {/* ==== PAGINATION ==== */}
+        {/* Pagination */}
         {totalPages > 1 && (
-          <div style={styles.pagination}>
-            <button style={styles.pageBtn} disabled={currentPage === 1} onClick={() => setCurrentPage((p) => p - 1)}>
+          <motion.div
+            style={styles.pagination}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+          >
+            <button
+              style={styles.pageBtn}
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => p - 1)}
+            >
               «
             </button>
             {Array.from({ length: totalPages }, (_, i) => (
               <button
                 key={i}
-                style={{ ...styles.pageBtn, ...(currentPage === i + 1 ? styles.activePageBtn : styles.inactivePageBtn) }}
+                style={{
+                  ...styles.pageBtn,
+                  ...(currentPage === i + 1
+                    ? styles.activePageBtn
+                    : styles.inactivePageBtn),
+                }}
                 onClick={() => setCurrentPage(i + 1)}
               >
                 {i + 1}
@@ -290,7 +402,7 @@ useEffect(() => {
             >
               »
             </button>
-          </div>
+          </motion.div>
         )}
 
         <motion.div
@@ -303,10 +415,19 @@ useEffect(() => {
         </motion.div>
       </div>
       <Footer />
+
+      {/* Spinner CSS */}
+      <style>
+        {`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}
+      </style>
     </div>
   );
 }
-
 
 const styles = {
   page: {
@@ -576,3 +697,12 @@ const styles = {
   
   
 };
+const style = document.createElement("style");
+style.innerHTML = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+document.head.appendChild(style);
+

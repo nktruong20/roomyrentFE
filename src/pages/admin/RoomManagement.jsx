@@ -7,7 +7,7 @@ import {
   FiUpload,
   FiImage,
 } from "react-icons/fi";
-import { createRoom, getRooms, deleteRoom } from "../../services/roomService";
+import { createRoom, getRooms, deleteRoom ,updateRoom } from "../../services/roomService";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPenToSquare, faTrash } from "@fortawesome/free-solid-svg-icons";
@@ -15,21 +15,29 @@ import Swal from "sweetalert2";
 import { FaCoins } from "react-icons/fa";
 import { getMe } from "../../services/authService";
 import "./RoomManagement.css";
-
+import { getProvinces, getDistricts, getWards } from "../../services/addressService";
 
 // =================== MAIN COMPONENT ===================
 export default function RoomManagement() {
   const [animate, setAnimate] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [provinces, setProvinces] = useState([]);
+const [districts, setDistricts] = useState([]);
+const [wards, setWards] = useState([]);
 
-  const [form, setForm] = useState({
+
+const [form, setForm] = useState({
   apartmentName: "",
-  address: "",
+  address: "", // sẽ build từ province + district + ward + detailAddress
+  province: { code: "", name: "" },
+  district: { code: "", name: "" },
+  ward: { code: "", name: "" },
+  detailAddress: "",
   type: "phòng trọ",
   price: "",
   area: "",
-  commission_percent: "",   // ✅ thêm
+  commission_percent: "",
   status: "Còn trống",
   description: "",
   utilities: { electricity: "", water: "", internet: "", service: "" },
@@ -63,6 +71,10 @@ export default function RoomManagement() {
   const [typeFilter, setTypeFilter] = useState("");
   const [priceFilter] = useState("");
 
+
+  const [editingRoom, setEditingRoom] = useState(null); 
+
+
   const filteredRooms = rooms.filter((room) => {
     const matchName =
       room.apartmentName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -76,6 +88,9 @@ export default function RoomManagement() {
   const indexOfLast = currentPage * itemsPerPage;
   const indexOfFirst = indexOfLast - itemsPerPage;
   const currentRooms = filteredRooms.slice(indexOfFirst, indexOfLast);
+// 👉 Ghép full địa chỉ để lưu
+const fullAddress = `${form.detailAddress}, ${form.ward.name}, ${form.district.name}, ${form.province.name}`;
+
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -112,6 +127,63 @@ export default function RoomManagement() {
     })();
   }, []);
 
+// load provinces khi mở modal
+useEffect(() => {
+  if (showModal) {
+    (async () => {
+      try {
+        const res = await getProvinces();
+        setProvinces(res);
+      } catch (err) {
+        console.error("❌ Lỗi load provinces:", err);
+      }
+    })();
+  }
+}, [showModal]);
+
+  useEffect(() => {
+  if (form.province.code) {
+    (async () => {
+      try {
+        const res = await getDistricts(form.province.code);
+        setDistricts(res);
+
+        // 👉 Chỉ reset nếu đang ở chế độ thêm mới (editingRoom == null)
+        if (!editingRoom) {
+          setForm((prev) => ({
+            ...prev,
+            district: { code: "", name: "" },
+            ward: { code: "", name: "" },
+          }));
+          setWards([]);
+        }
+      } catch (err) {
+        console.error("❌ Lỗi load districts:", err);
+      }
+    })();
+  }
+}, [form.province.code, editingRoom]);
+
+
+// load wards khi chọn district
+useEffect(() => {
+  if (form.district.code) {
+    (async () => {
+      try {
+        const res = await getWards(form.district.code);
+        setWards(res);
+
+        if (!editingRoom) {
+          setForm((prev) => ({ ...prev, ward: { code: "", name: "" } }));
+        }
+      } catch (err) {
+        console.error("❌ Lỗi load wards:", err);
+      }
+    })();
+  }
+}, [form.district.code, editingRoom]);
+
+
   // Helpers
   const numberToVietnamese = (num) => {
     if (!num) return "";
@@ -121,63 +193,72 @@ export default function RoomManagement() {
     return num + " VND";
   };
 
-  // Submit
- // Submit
 const handleSubmit = async (e) => {
   e.preventDefault();
 
   if (!currentUser?._id) {
-    Swal.fire("Bạn chưa đăng nhập", "Vui lòng đăng nhập lại để tạo phòng.", "warning");
-    return;
-  }
-
-  if (!form.apartmentName?.trim() || !form.address?.trim() || !form.price || !form.area) {
-    Swal.fire("Thiếu thông tin", "Vui lòng nhập đủ tên căn hộ, địa chỉ, giá và diện tích.", "info");
+    Swal.fire("Bạn chưa đăng nhập", "Vui lòng đăng nhập lại để thao tác.", "warning");
     return;
   }
 
   try {
     setLoading(true);
-    const cleanPrice = parseInt(form.price.toString().replace(/[.,\s]/g, ""), 10) || 0;
+
+    // 👉 Chuẩn hoá giá trị trước khi gửi
+    const rawPrice = form.price?.toString().replace(/\D/g, ""); // bỏ mọi ký tự không phải số
+    const finalPrice = rawPrice ? parseInt(rawPrice, 10) : 0;
 
     const payload = {
       ...form,
-      price: cleanPrice,
-      utilities: {
-        electricity: Number(form.utilities?.electricity || 0),
-        water: Number(form.utilities?.water || 0),
-        internet: Number(form.utilities?.internet || 0),
-        service: Number(form.utilities?.service || 0),
-      },
-      commonAmenities: form.commonAmenities || {},
-      // ✅ lưu thông tin user tạo phòng
-      createdBy: {
-        id: currentUser?._id || "",
-        name: currentUser?.name || "",
-        phone: currentUser?.phone || "",
-      },
+      price: finalPrice, // luôn là Number
+      area: Number(form.area) || 0,
+      commission_percent: Number(form.commission_percent) || 0,
+      status:
+        form.status?.toLowerCase() === "đã thuê"
+          ? "Đã thuê"
+          : form.status?.toLowerCase() === "còn trống"
+          ? "Còn trống"
+          : "Đang bảo trì",
+      address: `${form.detailAddress}, ${form.ward.name}, ${form.district.name}, ${form.province.name}`,
     };
 
-    const newRoom = await createRoom(payload, images);
-
-    // ✅ Đẩy phòng mới lên đầu danh sách thay vì cuối
-    setRooms((prev) => [newRoom, ...prev]);
-
-    Swal.fire({
-      icon: "success",
-      title: "Tạo phòng thành công!",
-      timer: 1400,
-      showConfirmButton: false,
-    });
+    if (editingRoom) {
+      // 👉 Update phòng
+      const updated = await updateRoom(editingRoom._id, payload, images);
+      setRooms((prev) =>
+        prev.map((r) => (r._id === editingRoom._id ? updated : r))
+      );
+      Swal.fire({
+        icon: "success",
+        title: "Cập nhật thành công!",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } else {
+      // 👉 Tạo mới phòng
+      const newRoom = await createRoom(payload, images);
+      setRooms((prev) => [newRoom, ...prev]);
+      Swal.fire({
+        icon: "success",
+        title: "Tạo phòng mới thành công!",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    }
 
     handleClose();
   } catch (error) {
-    console.error("❌ Lỗi khi tạo phòng:", error);
-    Swal.fire("Lỗi", error?.response?.data?.error || "Không tạo được phòng", "error");
+    console.error("❌ Lỗi:", error);
+    Swal.fire(
+      "Lỗi",
+      error?.response?.data?.error || "Không thể lưu phòng",
+      "error"
+    );
   } finally {
     setLoading(false);
   }
 };
+
 
 
   // Upload ảnh
@@ -190,33 +271,39 @@ const handleSubmit = async (e) => {
 
   // Input thay đổi
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+  const { name, value } = e.target;
 
-    if (name.includes(".")) {
-      const [group, field] = name.split(".");
-      setForm((prev) => ({
-        ...prev,
-        [group]: {
-          ...prev[group],
-          [field]: value,
-        },
-      }));
-    } else {
-      let newValue = value;
-      if (name === "price") {
-        const rawNumber = value.replace(/\D/g, "");
-        const numberValue = rawNumber ? parseInt(rawNumber, 10) : 0;
-        newValue = numberValue.toLocaleString("vi-VN");
+  if (name === "detailAddress") {
+    setForm((prev) => ({ ...prev, detailAddress: value }));
+    return;
+  }
 
-        const percent = numberValue < 5000000 ? 10 : 5;
-        const commission = (numberValue * percent) / 100;
-        setCommissionPercent(percent);
-        setCommissionValue(commission);
-        setPriceInWords(numberToVietnamese(numberValue));
-      }
-      setForm((prev) => ({ ...prev, [name]: newValue }));
+  if (name.includes(".")) {
+    const [group, field] = name.split(".");
+    setForm((prev) => ({
+      ...prev,
+      [group]: {
+        ...prev[group],
+        [field]: value,
+      },
+    }));
+  } else {
+    let newValue = value;
+    if (name === "price") {
+      const rawNumber = value.replace(/\D/g, "");
+      const numberValue = rawNumber ? parseInt(rawNumber, 10) : 0;
+      newValue = numberValue.toLocaleString("vi-VN");
+
+      const percent = numberValue < 5000000 ? 10 : 5;
+      const commission = (numberValue * percent) / 100;
+      setCommissionPercent(percent);
+      setCommissionValue(commission);
+      setPriceInWords(numberToVietnamese(numberValue));
     }
-  };
+    setForm((prev) => ({ ...prev, [name]: newValue }));
+  }
+};
+
 
   // Checkbox tiện ích chung
   const handleCheckboxChange = (e) => {
@@ -233,22 +320,49 @@ const handleSubmit = async (e) => {
 
   // Close modal + animation
   const handleClose = () => {
-    setClosing(true);
-    setTimeout(() => {
-      setShowModal(false);
-      setClosing(false);
-    }, 300);
-  };
+  setClosing(true);
+  setTimeout(() => {
+    setShowModal(false);
+    setClosing(false);
+    setEditingRoom(null); // reset về chế độ thêm mới
+    setForm({
+      apartmentName: "",
+      address: "",
+      province: { code: "", name: "" },
+      district: { code: "", name: "" },
+      ward: { code: "", name: "" },
+      detailAddress: "",
+      type: "phòng trọ",
+      price: "",
+      area: "",
+      commission_percent: "",
+      status: "Còn trống",
+      description: "",
+      utilities: { electricity: "", water: "", internet: "", service: "" },
+      commonAmenities: {
+        camera: false, smartLock: false, fireAlarm: false,
+        emergencyExit: false, washingArea: false, parking: false,
+        laundryRoom: false, elevator: false, privateToilet: false,
+        staircase: false, fireExtinguisher: false,
+      },
+    });
+    setImages([]);
+    setPreviews([]);
+  }, 300);
+};
+
 
   // ✅ Disable nút Lưu nếu chưa sẵn sàng
-  const canSubmit =
-    !!currentUser?._id &&
-    !!form.apartmentName?.trim() &&
-    !!form.address?.trim() &&
-    !!form.price &&
-    !!form.area &&
-    !loading;
-
+const canSubmit =
+  !!currentUser?._id &&
+  !!form.apartmentName?.trim() &&
+  !!form.province.code &&
+  !!form.district.code &&
+  !!form.ward.code &&
+  !!form.detailAddress?.trim() &&
+  !!form.price &&
+  !!form.area &&
+  !loading;
   return (
     <>
       <div
@@ -386,14 +500,66 @@ const handleSubmit = async (e) => {
                   <td style={styles.td}>
                     <div style={styles.actions}>
                       <button
-                        style={styles.editBtn}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          console.log("Sửa", room._id);
-                        }}
-                      >
-                        <FontAwesomeIcon icon={faPenToSquare} />
-                      </button>
+  style={styles.editBtn}
+  onClick={async (e) => {
+  e.stopPropagation();
+  setEditingRoom(room); // lưu phòng đang sửa
+
+  // ✅ Gán lại dữ liệu cho form (giữ nguyên giá trị cũ nếu có)
+  setForm({
+    apartmentName: room.apartmentName || "",
+    detailAddress: room.detailAddress || "",
+    type: room.type || "phòng trọ",
+    price: room.price ? room.price.toLocaleString("vi-VN") : "",
+    area: room.area || "",
+    commission_percent: room.commission_percent || "",
+    status: room.status || "Còn trống",
+    description: room.description || "",
+    floor: room.floor || 1,
+    numberOfRooms: room.numberOfRooms || 1,
+    utilities: room.utilities || { electricity: "", water: "", internet: "", service: "" },
+    commonAmenities: room.commonAmenities || {
+      camera: false,
+      smartLock: false,
+      fireAlarm: false,
+      privateToilet: false,
+      washingArea: false,
+      parking: false,
+      staircase: false,
+      elevator: false,
+      fireExtinguisher: false,
+    },
+    province: room.province || { code: "", name: "" },
+    district: room.district || { code: "", name: "" },
+    ward: room.ward || { code: "", name: "" },
+  });
+
+  // ✅ Preview ảnh
+  setPreviews(room.images?.map((img) => img.url) || []);
+  setImages([]);
+
+  // ✅ Load lại districts + wards theo dữ liệu cũ
+  try {
+    if (room.province?.code) {
+      const dists = await getDistricts(room.province.code);
+      setDistricts(dists);
+    }
+    if (room.district?.code) {
+      const ws = await getWards(room.district.code);
+      setWards(ws);
+    }
+  } catch (err) {
+    console.error("❌ Lỗi load địa chỉ khi edit:", err);
+  }
+
+  setShowModal(true);
+}}
+
+>
+  <FontAwesomeIcon icon={faPenToSquare} />
+</button>
+
+
                       <button
                         style={styles.deleteBtn}
                         onClick={async (e) => {
@@ -467,7 +633,7 @@ const handleSubmit = async (e) => {
             <div className="fancy-header">
               <div className="fancy-header-left">
                 <FiImage size={24} className="icon" />
-                <h2>Thêm phòng mới</h2>
+                <h2>{editingRoom ? "Cập nhật phòng" : "Thêm phòng mới"}</h2>
               </div>
               <button className="close-btn" onClick={handleClose}>
                 <FiX size={22} />
@@ -482,16 +648,104 @@ const handleSubmit = async (e) => {
   <label>Tên căn hộ</label>
   <input type="text" name="apartmentName" value={form.apartmentName} onChange={handleInputChange} required />
 
-  <label>Địa chỉ</label>
-  <input type="text" name="address" value={form.address} onChange={handleInputChange} required />
+      <label>Địa chỉ</label>
+{/* Province */}
+<select
+  value={form.province.code}
+  onChange={(e) => {
+    const selected = provinces.find(
+      (p) => String(p.code) === String(e.target.value)
+    );
+    console.log("✔ Province selected:", selected);
 
-  <label>Loại phòng</label>
-  <select name="type" value={form.type} onChange={handleInputChange}>
-    <option>phòng trọ</option>
-    <option>chung cư</option>
-    <option>nhà ở</option>
-    <option>chung cư mini</option>
-  </select>
+    setForm((prev) => ({
+      ...prev,
+      province: { code: selected?.code || "", name: selected?.name || "" },
+      district: { code: "", name: "" }, // reset district + ward khi đổi province
+      ward: { code: "", name: "" },
+    }));
+    setDistricts([]); // clear list
+    setWards([]);
+  }}
+>
+  <option value="">-- Chọn Tỉnh/Thành phố --</option>
+  {provinces.map((p) => (
+    <option key={p.code} value={p.code}>
+      {p.name}
+    </option>
+  ))}
+</select>
+
+{/* District */}
+<select
+  value={form.district.code}
+  onChange={(e) => {
+    const selected = districts.find(
+      (d) => String(d.code) === String(e.target.value)
+    );
+    console.log("✔ District selected:", selected);
+
+    setForm((prev) => ({
+      ...prev,
+      district: { code: selected?.code || "", name: selected?.name || "" },
+      ward: { code: "", name: "" }, // reset ward khi đổi district
+    }));
+    setWards([]); // clear ward list
+  }}
+  disabled={!form.province.code}
+>
+  <option value="">-- Chọn Quận/Huyện --</option>
+  {districts.map((d) => (
+    <option key={d.code} value={d.code}>
+      {d.name}
+    </option>
+  ))}
+</select>
+
+{/* Ward */}
+<select
+  value={form.ward.code}
+  onChange={(e) => {
+    const selected = wards.find(
+      (w) => String(w.code) === String(e.target.value)
+    );
+    console.log("✔ Ward selected:", selected);
+
+    setForm((prev) => ({
+      ...prev,
+      ward: { code: selected?.code || "", name: selected?.name || "" },
+    }));
+  }}
+  disabled={!form.district.code}
+>
+  <option value="">-- Chọn Phường/Xã --</option>
+  {wards.map((w) => (
+    <option key={w.code} value={w.code}>
+      {w.name}
+    </option>
+  ))}
+</select>
+
+
+<input
+  type="text"
+  name="detailAddress"
+  value={form.detailAddress}
+  onChange={handleInputChange}
+  placeholder="Số nhà, thôn, đường ..."
+/>
+
+<label>Loại phòng</label>
+<select name="type" value={form.type} onChange={handleInputChange}>
+  <option value="phòng trọ">Phòng trọ</option>
+  <option value="chung cư/căn hộ">Chung cư / Căn hộ</option>
+  <option value="nhà nguyên căn">Nhà nguyên căn</option>
+  <option value="biệt thự">Biệt thự</option>
+  <option value="mặt bằng/cửa hàng">Mặt bằng / Cửa hàng</option>
+  <option value="văn phòng">Văn phòng</option>
+  <option value="nhà xưởng/kho">Nhà xưởng / Kho</option>
+</select>
+
 
   <label>Giá (VND)</label>
   <input type="text" name="price" value={form.price} onChange={handleInputChange} required />
@@ -512,12 +766,12 @@ const handleSubmit = async (e) => {
   <label>Diện tích (m²)</label>
   <input type="number" name="area" value={form.area} onChange={handleInputChange} required />
 
-  <label>Trạng thái</label>
-  <select name="status" value={form.status} onChange={handleInputChange}>
-    <option>Còn trống</option>
-    <option>Đã thuê</option>
-    <option>Đang bảo trì</option>
-  </select>
+<label>Trạng thái</label>
+<select name="status" value={form.status} onChange={handleInputChange}>
+  <option value="Còn trống">Còn trống</option>
+  <option value="Đã thuê">Đã thuê</option>
+  <option value="Đang bảo trì">Đang bảo trì</option>
+</select>
 
    <div className="extra-info">
                     <input

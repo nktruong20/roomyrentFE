@@ -4,7 +4,7 @@ import { io } from "socket.io-client";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-// ✅ Helper để luôn gắn token vào header
+// ================== Helper ==================
 const getAuthHeaders = () => {
   const token =
     localStorage.getItem("token") || sessionStorage.getItem("token");
@@ -14,7 +14,18 @@ const getAuthHeaders = () => {
 
 // ================== API CALLS ==================
 
-// ✅ Tạo lịch xem phòng
+/**
+ * ✅ Tạo lịch xem phòng
+ * @param {Object} scheduleData
+ *  {
+ *    room_id,
+ *    customer_name,
+ *    customer_phone,
+ *    start_time,
+ *    end_time (optional),
+ *    note
+ *  }
+ */
 export const createSchedule = async (scheduleData) => {
   try {
     const res = await axios.post(`${API_URL}/schedules`, scheduleData, {
@@ -27,7 +38,9 @@ export const createSchedule = async (scheduleData) => {
   }
 };
 
-// ✅ Lấy tất cả lịch (Admin xem tất cả)
+/**
+ * ✅ Lấy tất cả lịch (Admin xem tất cả)
+ */
 export const getSchedules = async () => {
   try {
     const res = await axios.get(`${API_URL}/schedules`, {
@@ -35,15 +48,16 @@ export const getSchedules = async () => {
     });
     return res.data;
   } catch (err) {
-    console.error(
-      "❌ Lỗi khi lấy danh sách lịch:",
-      err.response?.data || err.message
-    );
+    console.error("❌ Lỗi khi lấy danh sách lịch:", err.response?.data || err.message);
     throw err.response?.data || "Lỗi lấy danh sách lịch";
   }
 };
 
-// ✅ Cập nhật lịch
+/**
+ * ✅ Cập nhật lịch
+ * @param {String} id 
+ * @param {Object} updateData 
+ */
 export const updateSchedule = async (id, updateData) => {
   try {
     const res = await axios.put(`${API_URL}/schedules/${id}`, updateData, {
@@ -51,15 +65,15 @@ export const updateSchedule = async (id, updateData) => {
     });
     return res.data;
   } catch (err) {
-    console.error(
-      "❌ Lỗi khi cập nhật lịch:",
-      err.response?.data || err.message
-    );
+    console.error("❌ Lỗi khi cập nhật lịch:", err.response?.data || err.message);
     throw err.response?.data || "Lỗi cập nhật lịch";
   }
 };
 
-// ✅ Xoá lịch
+/**
+ * ✅ Xoá lịch
+ * @param {String} id 
+ */
 export const deleteSchedule = async (id) => {
   try {
     const res = await axios.delete(`${API_URL}/schedules/${id}`, {
@@ -72,7 +86,9 @@ export const deleteSchedule = async (id) => {
   }
 };
 
-// ✅ Lấy lịch của riêng tôi
+/**
+ * ✅ Lấy lịch của chính user
+ */
 export const getMySchedules = async () => {
   try {
     const res = await axios.get(`${API_URL}/schedules/me`, {
@@ -80,35 +96,56 @@ export const getMySchedules = async () => {
     });
     return res.data;
   } catch (err) {
-    console.error(
-      "❌ Error fetching my schedules:",
-      err.response?.data || err.message
-    );
+    console.error("❌ Lỗi khi lấy lịch của tôi:", err.response?.data || err.message);
     throw err.response?.data || "Không thể tải lịch sử đặt lịch";
   }
 };
 
-// ================== SOCKET.IO ==================
+/**
+ * ✅ Kiểm tra nhân sự có rảnh trong khoảng thời gian không
+ * @param {String} staffId 
+ * @param {String} start_time (ISO string)
+ * @param {Number} duration (minutes, default = 60)
+ */
+export const checkStaffAvailability = async (staffId, start_time, duration = 60) => {
+  try {
+    const res = await axios.get(
+      `${API_URL}/schedules/staff/${staffId}/availability`,
+      {
+        params: { time: start_time, duration },
+        headers: getAuthHeaders(),
+      }
+    );
+    return res.data; // { available: true/false, conflicts: [...] }
+  } catch (err) {
+    console.error("❌ Lỗi khi check availability:", err.response?.data || err.message);
+    throw err.response?.data || "Không thể kiểm tra lịch nhân sự";
+  }
+};
 
-// ✅ Khởi tạo socket
+// ================== SOCKET.IO ==================
 const socket = io(API_URL, {
-  transports: ["websocket"], // ép dùng websocket cho nhanh và ổn định
+  transports: ["websocket"],
   autoConnect: true,
 });
 
-// ✅ Lắng nghe sự kiện realtime từ server
+/**
+ * ✅ Đăng ký sự kiện realtime
+ */
 export const subscribeSchedules = (onCreated, onUpdated, onDeleted) => {
   if (onCreated) socket.on("scheduleCreated", onCreated);
   if (onUpdated) socket.on("scheduleUpdated", onUpdated);
   if (onDeleted) socket.on("scheduleDeleted", onDeleted);
 };
 
-// ✅ Hủy lắng nghe (khi component unmount)
+/**
+ * ✅ Hủy đăng ký sự kiện realtime
+ */
 export const unsubscribeSchedules = () => {
   socket.off("scheduleCreated");
   socket.off("scheduleUpdated");
   socket.off("scheduleDeleted");
 };
 
-// ✅ Xuất luôn socket nếu cần xài chỗ khác
+// ✅ Xuất socket
 export { socket };

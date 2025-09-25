@@ -126,7 +126,7 @@ export default function AdminDashboard() {
             <table>
               <thead>
                 <tr>
-                  <th>#</th>
+                  <th>ID</th>
                   <th>Tên</th>
                   <th>Email</th>
                   <th>SĐT</th>

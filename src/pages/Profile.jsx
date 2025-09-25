@@ -23,6 +23,13 @@ import {
   unsubscribeSchedules,
 } from "../services/scheduleService";
 import { getCommissions } from "../services/commissionService";
+import {
+  FiCheckCircle,
+  FiXCircle,
+  FiUserCheck,
+  FiLoader,
+  FiEye,
+} from "react-icons/fi";
 
 export default function Profile() {
   const [user, setUser] = useState(null);
@@ -46,6 +53,10 @@ export default function Profile() {
     visible: { opacity: 1, y: 0 },
     exit: { opacity: 0, y: -20 },
   };
+  useEffect(() => {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}, []);
+
 
   // ✅ Fetch user
   useEffect(() => {
@@ -164,11 +175,28 @@ export default function Profile() {
   const revs = [...revenues].sort(
     (a, b) => new Date(b.createdAt || b.create_at || 0) - new Date(a.createdAt || a.create_at || 0)
   );
-  const schs = [...schedules].sort(
-    (a, b) =>
-      new Date(b.updatedAt || b.createdAt || 0) -
-      new Date(a.updatedAt || a.createdAt || 0)
-  );
+ // Thứ tự status (càng nhỏ càng ưu tiên hiển thị trên)
+const statusOrder = {
+  pending: 1,
+  assigned: 2,
+  accepted: 3,
+  viewed: 4,
+  done: 5,
+  canceled: 6,
+};
+
+const schs = [...schedules].sort((a, b) => {
+  const orderA = statusOrder[a.status] || 99;
+  const orderB = statusOrder[b.status] || 99;
+
+  if (orderA !== orderB) {
+    return orderA - orderB; // Ưu tiên theo status
+  }
+
+  // Nếu status giống nhau → sắp xếp theo ngày mới nhất
+  return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
+});
+
 
   const revTotal = pageCount(revs, REV_PER_PAGE);
   const hisTotal = pageCount(schs, HIS_PER_PAGE);
@@ -233,40 +261,50 @@ export default function Profile() {
     );
   }
 
-  // renderStatus
-  const renderStatus = (status) => {
-    switch (status) {
-      case "done":
-        return (
-          <span style={{ color: "#16a34a", fontWeight: 600 }}>✅ Hoàn thành</span>
-        );
-      case "canceled":
-        return (
-          <span style={{ color: "#dc2626", fontWeight: 600 }}>❌ Đã hủy</span>
-        );
-      case "assigned":
-        return (
-          <span style={{ color: "#2563eb", fontWeight: 600 }}>
-            📌 Đang chờ nhân sự chấp nhận
-          </span>
-        );
-      case "accepted":
-        return (
-          <span style={{ color: "#0ea5e9", fontWeight: 600 }}>
-            🤝 Đã chấp nhận – chờ đi xem
-          </span>
-        );
-      case "pending":
-        return (
-          <span style={{ color: "#a16207", fontWeight: 600 }}>⏳ Chờ xử lý</span>
-        );
-      default:
-        return (
-          <span style={{ color: "#6b7280", fontWeight: 600 }}>❓ Không rõ</span>
-        );
-    }
-  };
-
+ const renderStatus = (status) => {
+  switch (status) {
+    case "done":
+      return (
+        <span style={statusStyles.confirmed}>
+          <FiCheckCircle /> Hoàn tất
+        </span>
+      );
+    case "canceled":
+      return (
+        <span style={statusStyles.canceled}>
+          <FiXCircle /> Đã hủy
+        </span>
+      );
+    case "viewed":
+      return (
+        <span style={statusStyles.viewed}>
+          <FiEye /> Đã xem
+        </span>
+      );
+    case "accepted":
+      return (
+        <span style={statusStyles.accepted}>
+          <FiUserCheck /> Đã chấp nhận
+        </span>
+      );
+    case "assigned":
+      return (
+        <span style={statusStyles.assigned}>
+          <FiUserCheck /> Đang chờ chấp nhận
+        </span>
+      );
+    case "pending":
+      return (
+        <span style={statusStyles.pending}>
+          <FiLoader /> Chờ xử lý
+        </span>
+      );
+    default:
+      return (
+        <span style={statusStyles.unknown}>❓ Không rõ</span>
+      );
+  }
+};
   return (
     <div style={{ paddingTop: 80 }}>
       <Header />
@@ -520,13 +558,18 @@ export default function Profile() {
                             <p style={styles.historyRoom}>
                               {sch.room_id?.apartmentName || "Phòng không rõ"}
                             </p>
-                            <p style={styles.historyDate}>
-                              <FaClock style={styles.iconInline} />{" "}
-                              {new Date(
-                                sch.scheduled_time
-                              ).toLocaleString("vi-VN")}{" "}
-                              — {renderStatus(sch.status)}
-                            </p>
+                           <p style={styles.historyDate}>
+  <FaClock style={styles.iconInline} />{" "}
+  {sch.start_time
+    ? new Date(sch.start_time).toLocaleString("vi-VN")
+    : "Chưa có"}{" "}
+  →{" "}
+  {sch.end_time
+    ? new Date(sch.end_time).toLocaleString("vi-VN")
+    : "Chưa rõ"}{" "}
+  — {renderStatus(sch.status)}
+</p>
+
                           </div>
                         </motion.div>
                       ))}
@@ -788,4 +831,85 @@ const styles = {
   },
   historyRoom: { fontSize: 15, fontWeight: 600, margin: 0 },
   historyDate: { fontSize: 14, color: "#6b7280", margin: 0 },
+};
+const statusStyles = {
+  base: {
+    padding: "4px 8px",
+    borderRadius: 8,
+    fontSize: 13,
+    fontWeight: 600,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+  },
+  confirmed: {
+    background: "#dcfce7",
+    color: "#15803d",
+    padding: "4px 8px",
+    borderRadius: 8,
+    fontWeight: 600,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+  },
+  canceled: {
+    background: "#fee2e2",
+    color: "#b91c1c",
+    padding: "4px 8px",
+    borderRadius: 8,
+    fontWeight: 600,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+  },
+  viewed: {
+    background: "#e0f2fe",
+    color: "#0369a1",
+    padding: "4px 8px",
+    borderRadius: 8,
+    fontWeight: 600,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+  },
+  accepted: {
+    background: "#f0fdf4",
+    color: "#16a34a",
+    padding: "4px 8px",
+    borderRadius: 8,
+    fontWeight: 600,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+  },
+  assigned: {
+    background: "#dbeafe",
+    color: "#1d4ed8",
+    padding: "4px 8px",
+    borderRadius: 8,
+    fontWeight: 600,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+  },
+  pending: {
+    background: "#fef9c3",
+    color: "#a16207",
+    padding: "4px 8px",
+    borderRadius: 8,
+    fontWeight: 600,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+  },
+  unknown: {
+    background: "#f3f4f6",
+    color: "#6b7280",
+    padding: "4px 8px",
+    borderRadius: 8,
+    fontWeight: 600,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+  },
 };

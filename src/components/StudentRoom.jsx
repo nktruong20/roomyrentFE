@@ -7,7 +7,14 @@ import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPhone, faHeart } from "@fortawesome/free-solid-svg-icons";
-import { getRooms } from "../services/roomService"; // ✅ dùng API thật
+import { getRooms } from "../services/roomService";
+import {
+  addFavourite,
+  removeFavourite,
+  getFavouritesByUser,
+} from "../services/favouriteService";
+import { getMe } from "../services/authService";
+import Swal from "sweetalert2";
 
 const StudentRoom = () => {
   const navigate = useNavigate();
@@ -15,7 +22,30 @@ const StudentRoom = () => {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [visiblePhones, setVisiblePhones] = useState({});
-  const [favourites, setFavourites] = useState({}); // local-only (không gọi API yêu thích ở đây)
+  const [favourites, setFavourites] = useState({});
+  const [user, setUser] = useState(null);
+
+  const shortAddress = (address) => {
+    if (!address) return "";
+    const parts = address.split(",");
+    let result = parts.slice(-2).join(",").trim();
+    result = result.replace(/Thành phố\s+/gi, "TP ");
+    result = result.replace(/Tỉnh\s+/gi, "T ");
+    return result;
+  };
+
+  // ====== Lấy user ======
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const data = await getMe();
+        setUser(data);
+      } catch {
+        setUser(null);
+      }
+    };
+    fetchUser();
+  }, []);
 
   // ====== Lấy rooms từ API ======
   useEffect(() => {
@@ -32,13 +62,31 @@ const StudentRoom = () => {
     fetchRooms();
   }, []);
 
+  // ====== Lấy danh sách favourites khi có user ======
+  useEffect(() => {
+    const fetchFavourites = async () => {
+      if (!user) return;
+      try {
+        const favs = await getFavouritesByUser(user._id);
+        const favMap = {};
+        favs.forEach((f) => {
+          favMap[f.room_id._id] = f._id;
+        });
+        setFavourites(favMap);
+      } catch (err) {
+        console.error("❌ Lỗi lấy favourites:", err);
+      }
+    };
+    fetchFavourites();
+  }, [user]);
+
   // ====== Lọc rooms giá ≤ 4 triệu ======
   const filteredRooms = useMemo(
     () => rooms.filter((r) => Number(r.price) <= 4_000_000),
     [rooms]
   );
 
-  // ====== Cấu hình slider (giữ nguyên) ======
+  // ====== Slider settings ======
   const sliderSettings = {
     dots: false,
     infinite: true,
@@ -52,31 +100,83 @@ const StudentRoom = () => {
       { breakpoint: 640, settings: { slidesToShow: 1 } },
     ],
   };
+// Arrow components
+function NextArrow(props) {
+  const { onClick } = props;
+  return (
+    <div
+      className="arrow next"
+      onClick={onClick}
+      style={{ ...styles.arrow, right: -20, left: "auto" }} // 👉 chỉnh về bên phải
+    >
+      <FaChevronRight />
+    </div>
+  );
+}
 
-  // ====== Arrow components (giữ nguyên) ======
-  function NextArrow(props) {
-    const { onClick } = props;
-    return (
-      <div className="arrow next" onClick={onClick} style={styles.arrow}>
-        <FaChevronRight />
-      </div>
-    );
-  }
-  function PrevArrow(props) {
-    const { onClick } = props;
-    return (
-      <div className="arrow prev" onClick={onClick} style={styles.arrow}>
-        <FaChevronLeft />
-      </div>
-    );
-  }
+function PrevArrow(props) {
+  const { onClick } = props;
+  return (
+    <div
+      className="arrow prev"
+      onClick={onClick}
+      style={{ ...styles.arrow, left: -20, right: "auto" }} // 👉 chỉnh về bên trái
+    >
+      <FaChevronLeft />
+    </div>
+  );
+}
 
-  // ====== Handlers local ======
-  const togglePhone = (roomId) => {
-    setVisiblePhones((prev) => ({ ...prev, [roomId]: !prev[roomId] }));
+
+  // ====== Handlers ======
+  const togglePhone = (roomId, phone) => {
+    if (!user) {
+      Swal.fire({
+        icon: "warning",
+        title: "Vui lòng đăng nhập!",
+        text: "Để xem số điện thoại, bạn cần phải đăng nhập.",
+        confirmButtonText: "Đăng nhập",
+        confirmButtonColor: "#7c3aed",
+      }).then((result) => {
+        if (result.isConfirmed) navigate("/login");
+      });
+    } else {
+      setVisiblePhones((prev) => ({ ...prev, [roomId]: !prev[roomId] }));
+    }
   };
-  const toggleFavourite = (roomId) => {
-    setFavourites((prev) => ({ ...prev, [roomId]: !prev[roomId] }));
+
+  const toggleFavourite = async (roomId) => {
+    if (!user) {
+      Swal.fire({
+        icon: "warning",
+        title: "Vui lòng đăng nhập!",
+        text: "Bạn cần đăng nhập để thêm phòng vào yêu thích.",
+        confirmButtonText: "Đăng nhập",
+        confirmButtonColor: "#7c3aed",
+      }).then((result) => {
+        if (result.isConfirmed) navigate("/login");
+      });
+      return;
+    }
+
+    try {
+      if (favourites[roomId]) {
+        await removeFavourite(favourites[roomId]);
+        setFavourites((prev) => {
+          const newFav = { ...prev };
+          delete newFav[roomId];
+          return newFav;
+        });
+        Swal.fire("Đã xóa", "Bỏ phòng khỏi yêu thích", "success");
+      } else {
+        const res = await addFavourite(roomId);
+        setFavourites((prev) => ({ ...prev, [roomId]: res._id }));
+        Swal.fire("Thành công", "Đã thêm phòng vào yêu thích", "success");
+      }
+    } catch (err) {
+      console.error("❌ Lỗi API:", err);
+      Swal.fire("Lỗi", err.message || "Không thể xử lý yêu thích", "error");
+    }
   };
 
   if (loading) {
@@ -128,7 +228,8 @@ const StudentRoom = () => {
                         <span
                           style={styles.commissionBadge}
                           title={`Hoa hồng: ${(
-                            (Number(room.price) * Number(room.commission_percent)) /
+                            (Number(room.price) *
+                              Number(room.commission_percent)) /
                             100
                           ).toLocaleString()} VND`}
                         >
@@ -138,8 +239,7 @@ const StudentRoom = () => {
                     </div>
 
                     <p style={styles.roomInfo}>
-                      {room.type || "Căn hộ"} • {room.area || 0} m² •{" "}
-                      {room.address || "Chưa có địa chỉ"}
+                      {room.type} • {room.area} m² • {shortAddress(room.address)}
                     </p>
 
                     {/* Người đăng */}
@@ -167,11 +267,11 @@ const StudentRoom = () => {
                         style={styles.phoneBtn}
                         onClick={(e) => {
                           e.stopPropagation();
-                          togglePhone(id);
+                          togglePhone(id, phone);
                         }}
                       >
                         <FontAwesomeIcon icon={faPhone} style={{ marginRight: 6 }} />
-                        {phoneVisible ? phone || "Chưa có" : `${maskedPhone} · Hiện số`}
+                        {phoneVisible ? phone || "Chưa có" : `${maskedPhone}`}
                       </button>
 
                       <button
@@ -200,7 +300,7 @@ const StudentRoom = () => {
   );
 };
 
-/* ====== Styles (giữ layout slider, card đồng bộ RoomList) ====== */
+/* ====== Styles giữ nguyên layout ====== */
 const styles = {
   page: {
     padding: "40px 40px",
@@ -220,44 +320,49 @@ const styles = {
     letterSpacing: 1,
     textShadow: "0 3px 6px rgba(0,0,0,0.1)",
   },
-  arrow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: 36,
-    height: 36,
-    borderRadius: "50%",
-    background: "#fff",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
-    cursor: "pointer",
-    position: "absolute",
-    zIndex: 2,
-    top: "45%",
-    right: -10,
-  },
-  cardWrapper: {
-    padding: "0 15px",
-    display: "flex",
-    justifyContent: "center",
-  },
-  card: {
-    background: "#fff",
-    borderRadius: 16,
-    overflow: "hidden",
-    boxShadow: "0 6px 20px rgba(0,0,0,0.08)",
-    transition: "transform 0.3s, box-shadow 0.3s",
-    cursor: "pointer",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    margin: "0 15px",
-  },
-  imageWrapper: {
-    width: "100%",
-    height: 180,
-    position: "relative",
-    overflow: "hidden",
-  },
+ arrow: {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 36,
+  height: 36,
+  borderRadius: "50%",
+  background: "#fff",
+  boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+  cursor: "pointer",
+  position: "absolute",
+  zIndex: 2,
+  top: "45%",
+},
+
+ card: {
+  background: "#fff",
+  borderRadius: 16,
+  overflow: "hidden",
+  boxShadow: "0 6px 20px rgba(0,0,0,0.08)",
+  transition: "transform 0.3s, box-shadow 0.3s",
+  cursor: "pointer",
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "space-between",
+  margin: "0 15px",
+  height: "100%",          // 🔑 chiếm full chiều cao của wrapper
+  minHeight: 400,          // 🔑 đặt chiều cao tối thiểu cho đồng đều
+},
+cardWrapper: {
+  padding: "0 15px",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "stretch",   // 🔑 để tất cả card con cao bằng nhau
+},
+
+imageWrapper: {
+  width: "100%",
+  height: 200,      // 🔑 đồng bộ chiều cao ảnh
+  position: "relative",
+  overflow: "hidden",
+},
+
   image: {
     width: "100%",
     height: "100%",

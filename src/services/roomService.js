@@ -13,7 +13,6 @@ export const createRoom = async (roomData, files) => {
   try {
     let images = [];
     if (files && files.length > 0) {
-      console.log("📤 Chuyển ảnh sang base64 để gửi lên API...");
       images = await Promise.all(
         files.map((file) =>
           toBase64(file).then((base64) => ({
@@ -26,11 +25,9 @@ export const createRoom = async (roomData, files) => {
 
     const payload = {
       ...roomData,
-      price: Number(roomData.price.toString().replace(/,/g, "")),
+      price: Number(roomData.price?.toString().replace(/,/g, "")),
       images,
     };
-
-    console.log("📤 Tạo phòng mới với payload:", payload);
 
     const response = await axios.post(`${API_URL}/rooms`, payload, {
       headers: {
@@ -46,7 +43,7 @@ export const createRoom = async (roomData, files) => {
   }
 };
 
-// ✅ Lấy tất cả phòng (public, không cần token)
+// ✅ Lấy tất cả phòng (public)
 export const getRooms = async () => {
   try {
     const response = await axios.get(`${API_URL}/rooms`);
@@ -68,6 +65,39 @@ export const getRoomById = async (id) => {
   }
 };
 
+// ✅ Lấy phòng theo filter (tỉnh/thành, quận/huyện, phường/xã, trạng thái)
+export const getRoomsFiltered = async (filters) => {
+  try {
+    const response = await axios.get(`${API_URL}/rooms/filter`, {
+      params: filters, // { provinceCode, districtCode, wardCode, status }
+    });
+    return response.data;
+  } catch (error) {
+    handleError("lọc phòng", error);
+    throw error;
+  }
+};
+
+// 👉 Shortcut: lấy theo quận
+export const getRoomsByDistrict = async (districtCode) => {
+  return getRoomsFiltered({ districtCode });
+};
+
+// 👉 Shortcut: lấy theo tỉnh
+export const getRoomsByProvince = async (provinceCode) => {
+  return getRoomsFiltered({ provinceCode });
+};
+
+// 👉 Shortcut: lấy theo phường
+export const getRoomsByWard = async (wardCode) => {
+  return getRoomsFiltered({ wardCode });
+};
+
+// 👉 Shortcut: lấy theo trạng thái
+export const getRoomsByStatus = async (status) => {
+  return getRoomsFiltered({ status });
+};
+
 // ✅ Cập nhật phòng
 export const updateRoom = async (id, roomData, files) => {
   try {
@@ -85,6 +115,7 @@ export const updateRoom = async (id, roomData, files) => {
 
     const payload = {
       ...roomData,
+      price: Number(roomData.price?.toString().replace(/,/g, "")),
       images: images.length > 0 ? images : roomData.images,
     };
 

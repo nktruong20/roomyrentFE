@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Swal from "sweetalert2";
-import { FaHeart, FaMapMarkerAlt, FaDollarSign } from "react-icons/fa";
+import { FaHeart, FaMapMarkerAlt, FaDollarSign, FaPhone } from "react-icons/fa";
 
 // Components
 import Header from "../components/Header";
@@ -21,7 +21,7 @@ export default function Favourite() {
   const [loading, setLoading] = useState(true);
   const [favourites, setFavourites] = useState([]);
   const [page, setPage] = useState(1);
-  const PER_PAGE = 9; // ✅ 9 card / trang
+  const PER_PAGE = 6; // ✅ 9 card / trang
 
   // Scroll to top khi mount
   useEffect(() => {
@@ -64,7 +64,6 @@ export default function Favourite() {
   const goTo = (p) => {
     const newPage = Math.min(Math.max(1, p), totalPages);
     setPage(newPage);
-    // ✅ Cuộn lên đầu khi đổi trang
     setTimeout(() => {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }, 100);
@@ -72,7 +71,8 @@ export default function Favourite() {
 
   const visiblePages = useMemo(() => {
     const max = 5;
-    if (totalPages <= max) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    if (totalPages <= max)
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
     let start = Math.max(1, page - 2);
     let end = start + max - 1;
     if (end > totalPages) {
@@ -92,13 +92,28 @@ export default function Favourite() {
   // Helpers
   const getRoom = (fav) => fav?.room_id || fav;
   const roomId = (fav) => getRoom(fav)?._id || fav?._id;
-  const roomTitle = (fav) => getRoom(fav)?.apartmentName || getRoom(fav)?.title || "Không rõ";
+  const roomTitle = (fav) =>
+    getRoom(fav)?.apartmentName || getRoom(fav)?.title || "Không rõ";
   const roomPrice = (fav) => getRoom(fav)?.price || 0;
-  const roomAddr = (fav) => getRoom(fav)?.address || getRoom(fav)?.location || "—";
   const roomImage = (fav) =>
     getRoom(fav)?.images?.[0]?.url ||
     getRoom(fav)?.image ||
     "https://via.placeholder.com/600x360?text=No+Image";
+
+  // 👉 Hàm rút gọn địa chỉ
+  const shortAddress = (address) => {
+    if (!address) return "";
+    const parts = address.split(",");
+    let result = parts.slice(-2).join(",").trim();
+    result = result.replace(/Thành phố\s+/gi, "");
+    result = result.replace(/Tỉnh\s+/gi, "");
+    return result;
+  };
+
+  const roomAddr = (fav) => {
+    const r = getRoom(fav);
+    return shortAddress(r?.address || r?.location || "");
+  };
 
   // Unlike với SweetAlert
   const handleUnlike = async (e, favouriteId) => {
@@ -198,8 +213,13 @@ export default function Favourite() {
                     transition={{ duration: 0.25 }}
                     onClick={() => navigate(`/rooms/${roomId(fav)}`)}
                   >
+                    {/* Image */}
                     <div style={styles.imageWrap}>
-                      <img src={roomImage(fav)} alt={roomTitle(fav)} style={styles.cardImg} />
+                      <img
+                        src={roomImage(fav)}
+                        alt={roomTitle(fav)}
+                        style={styles.cardImg}
+                      />
                       <div style={styles.priceTag}>
                         {roomPrice(fav).toLocaleString("vi-VN")} VND/tháng
                       </div>
@@ -212,15 +232,45 @@ export default function Favourite() {
                       </button>
                     </div>
 
+                    {/* Content */}
                     <div style={styles.cardContent}>
                       <h3 style={styles.cardTitle}>{roomTitle(fav)}</h3>
-                      <p style={styles.meta}>
+                      {/* <p style={styles.meta}>
                         <FaDollarSign />{" "}
                         <b>{roomPrice(fav).toLocaleString("vi-VN")} VND/tháng</b>
-                      </p>
+                      </p> */}
                       <p style={styles.meta}>
                         <FaMapMarkerAlt /> {roomAddr(fav)}
                       </p>
+
+                      {/* Owner */}
+                      {getRoom(fav)?.createdBy && (
+                        <div style={styles.ownerRow}>
+                          <img
+                            src={
+                              getRoom(fav)?.createdBy?.avatar ||
+                              "https://i.pravatar.cc/50"
+                            }
+                            alt={getRoom(fav)?.createdBy?.name || "Chủ phòng"}
+                            style={styles.avatar}
+                          />
+                          <div>
+                            <div style={styles.ownerName}>
+                              {getRoom(fav)?.createdBy?.name ||
+                                "Người đăng"}
+                            </div>
+                            <div style={styles.ownerDate}>
+                              {getRoom(fav)?.createdAt
+                                ? new Date(
+                                    getRoom(fav).createdAt
+                                  ).toLocaleDateString("vi-VN")
+                                : ""}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Actions */}
                       <div style={styles.actions}>
                         <button
                           style={styles.primaryBtn}
@@ -229,7 +279,7 @@ export default function Favourite() {
                             navigate(`/rooms/${roomId(fav)}`);
                           }}
                         >
-                          Xem chi tiết
+                          <FaPhone /> 0397643 ***
                         </button>
                         <button
                           style={styles.secondaryBtn}
@@ -246,16 +296,27 @@ export default function Favourite() {
 
             {/* Pagination */}
             <div style={styles.pagination}>
-              <button style={styles.pageBtn} disabled={page === 1} onClick={() => goTo(1)}>
+              <button
+                style={styles.pageBtn}
+                disabled={page === 1}
+                onClick={() => goTo(1)}
+              >
                 «
               </button>
-              <button style={styles.pageBtn} disabled={page === 1} onClick={() => goTo(page - 1)}>
+              <button
+                style={styles.pageBtn}
+                disabled={page === 1}
+                onClick={() => goTo(page - 1)}
+              >
                 ‹
               </button>
               {visiblePages.map((p) => (
                 <button
                   key={p}
-                  style={{ ...styles.pageBtn, ...(p === page ? styles.pageActive : {}) }}
+                  style={{
+                    ...styles.pageBtn,
+                    ...(p === page ? styles.pageActive : {}),
+                  }}
                   onClick={() => goTo(p)}
                 >
                   {p}
@@ -330,7 +391,11 @@ const styles = {
     maxWidth: 1160,
     margin: "0 auto",
   },
-  skeletonCard: { borderRadius: 18, background: "#fff", boxShadow: "0 6px 16px rgba(0,0,0,0.06)" },
+  skeletonCard: {
+    borderRadius: 18,
+    background: "#fff",
+    boxShadow: "0 6px 16px rgba(0,0,0,0.06)",
+  },
   skeletonImg: {
     height: 180,
     background: "linear-gradient(90deg, #eee, #f5f5f5, #eee)",
@@ -350,6 +415,7 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     cursor: "pointer",
+    overflow: "hidden",
   },
   imageWrap: { position: "relative", height: 180, overflow: "hidden" },
   cardImg: { width: "100%", height: "100%", objectFit: "cover" },
@@ -375,10 +441,35 @@ const styles = {
     color: "#ef4444",
     cursor: "pointer",
   },
-  cardContent: { padding: 16, textAlign: "left", display: "flex", flexDirection: "column", gap: 6 },
+  cardContent: {
+    padding: 16,
+    textAlign: "left",
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    flex: 1,
+    justifyContent: "space-between",
+  },
   cardTitle: { fontSize: 17, fontWeight: 700, margin: 0 },
-  meta: { fontSize: 14, color: "#6b7280", display: "flex", alignItems: "center", gap: 6, margin: 0 },
-  actions: { display: "flex", gap: 10, marginTop: 12 },
+  meta: {
+    fontSize: 14,
+    color: "#6b7280",
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    margin: 0,
+  },
+  ownerRow: { display: "flex", alignItems: "center", gap: 10, marginTop: 8 },
+  avatar: { width: 32, height: 32, borderRadius: "50%" },
+  ownerName: { fontSize: 14, fontWeight: 600 },
+  ownerDate: { fontSize: 12, color: "#6b7280" },
+  actions: {
+    marginTop: 14,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
   primaryBtn: {
     flex: 1,
     padding: "10px 12px",
@@ -387,6 +478,10 @@ const styles = {
     background: "linear-gradient(90deg,#6366f1,#8b5cf6)",
     color: "#fff",
     fontWeight: 700,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
   },
   secondaryBtn: {
     padding: "10px 12px",
@@ -399,7 +494,12 @@ const styles = {
     alignItems: "center",
     gap: 8,
   },
-  pagination: { display: "flex", gap: 8, justifyContent: "center", marginTop: 18 },
+  pagination: {
+    display: "flex",
+    gap: 8,
+    justifyContent: "center",
+    marginTop: 18,
+  },
   pageBtn: {
     minWidth: 42,
     height: 38,

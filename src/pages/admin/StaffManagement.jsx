@@ -1,17 +1,23 @@
 import React, { useEffect, useState } from "react";
-import { FiUsers } from "react-icons/fi";
+import {
+  FiUsers,
+  FiEye,
+  FiXCircle,
+} from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
-import Swal from "sweetalert2"; // 👉 thêm sweetalert2
+import Swal from "sweetalert2";
 import {
   getStaff,
   updateStaff,
   deleteStaff,
+  getMe,
 } from "../../services/authService";
 
 export default function StaffList() {
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingUser, setEditingUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -33,6 +39,16 @@ export default function StaffList() {
     });
   };
 
+  // Fetch current user
+  const fetchMe = async () => {
+    try {
+      const me = await getMe();
+      setCurrentUser(me);
+    } catch {
+      setCurrentUser(null);
+    }
+  };
+
   // Lấy danh sách nhân sự
   const fetchStaff = async () => {
     try {
@@ -47,6 +63,7 @@ export default function StaffList() {
   };
 
   useEffect(() => {
+    fetchMe();
     fetchStaff();
   }, []);
 
@@ -113,14 +130,14 @@ export default function StaffList() {
             <table>
               <thead>
                 <tr>
-                  <th>#</th>
+                  <th>ID</th>
                   <th>Tên nhân sự</th>
                   <th>Email</th>
                   <th>SĐT</th>
                   <th>Địa chỉ</th>
                   <th>Vai trò</th>
-                  <th>% Hoa hồng</th>
-                  <th>Hành động</th>
+                  {currentUser?.role === "boss" && <th>% Hoa hồng</th>}
+                  {currentUser?.role === "boss" && <th>Hành động</th>}
                 </tr>
               </thead>
               <tbody>
@@ -145,26 +162,36 @@ export default function StaffList() {
                           {user.role}
                         </span>
                       </td>
-                      <td>{user.commission_percent}%</td>
-                      <td>
-                        <button
-                          className="action-btn edit"
-                          onClick={() => openEdit(user)}
-                        >
-                          Sửa
-                        </button>
-                        <button
-                          className="action-btn delete"
-                          onClick={() => handleDelete(user._id)}
-                        >
-                          Xóa
-                        </button>
-                      </td>
+
+                      {currentUser?.role === "boss" && (
+                        <td>{user.commission_percent}%</td>
+                      )}
+                      {currentUser?.role === "boss" && (
+                        <td>
+                          <button
+                            className="icon-btn edit"
+                            onClick={() => openEdit(user)}
+                            title="Sửa"
+                          >
+                            <FiEye />
+                          </button>
+                          <button
+                            className="icon-btn delete"
+                            onClick={() => handleDelete(user._id)}
+                            title="Xóa"
+                          >
+                            <FiXCircle />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: "center", padding: 20 }}>
+                    <td
+                      colSpan={currentUser?.role === "boss" ? 8 : 6}
+                      style={{ textAlign: "center", padding: 20 }}
+                    >
                       ❌ Không có nhân sự
                     </td>
                   </tr>
@@ -250,6 +277,7 @@ export default function StaffList() {
           </motion.div>
         )}
       </AnimatePresence>
+
       {/* CSS */}
       <style>{`
         body {
@@ -331,28 +359,30 @@ export default function StaffList() {
           background: #fee2e2;
           color: #b91c1c;
         }
-        .action-btn {
+        .icon-btn {
           border: none;
-          padding: 8px 14px;
+          padding: 8px;
           border-radius: 8px;
           margin-right: 6px;
-          font-size: 13px;
-          font-weight: 600;
+          font-size: 18px;
           cursor: pointer;
           transition: all 0.25s ease;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
         }
-        .action-btn.edit {
+        .icon-btn.edit {
           background: #3b82f6;
           color: white;
         }
-        .action-btn.edit:hover {
+        .icon-btn.edit:hover {
           background: #2563eb;
         }
-        .action-btn.delete {
+        .icon-btn.delete {
           background: #ef4444;
           color: white;
         }
-        .action-btn.delete:hover {
+        .icon-btn.delete:hover {
           background: #dc2626;
         }
         /* Modal */
