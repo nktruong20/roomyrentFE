@@ -570,7 +570,7 @@ const handleSubmit = async (e) => {
               </button>
             </div>
             <div style={styles.contactItem}>
-              📧 {room.create_by?.email || "contact@roomyrent.vn"}
+              📧 {room.create_by?.email || "admin@roomyrent.vn"}
             </div>
 
               {room.status === "đã thuê" ? (

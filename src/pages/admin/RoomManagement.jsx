@@ -410,219 +410,294 @@ const canSubmit =
         </div>
 
         {/* Table */}
-        <div style={styles.tableWrapper}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>ID</th>
-                <th style={styles.th}>Image</th>
-                <th style={styles.th}>Address</th>
-                <th style={styles.th}>Type</th>
-                <th style={styles.th}>Price / Month</th>
-                <th style={styles.th}>Acreage</th>
-                <th style={styles.th}>Status</th>
-                <th style={styles.th}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentRooms.map((room, i) => (
-                <tr
-                  key={room._id || i}
-                  style={i % 2 === 0 ? styles.zebra : {}}
-                  className="row-hover"
-                  onClick={(e) => {
-                    if (
-                      e.target.tagName.toLowerCase() !== "button" &&
-                      e.target.tagName.toLowerCase() !== "svg" &&
-                      e.target.tagName.toLowerCase() !== "path"
-                    ) {
-                      navigate(`/admin/room/${room._id}`);
+<div style={styles.tableWrapper}>
+{/* Table / Loading */}
+{loading ? (
+  // 👉 Loading khi fetch API
+  <div style={styles.loadingWrapper}>
+    <div className="dot-bounce">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+    <p style={styles.loadingText}>Đang tải danh sách phòng...</p>
+
+    <style>
+      {`
+        .dot-bounce {
+          display: flex;
+          justify-content: center;
+          gap: 10px;
+        }
+        .dot-bounce span {
+          width: 16px;
+          height: 16px;
+          background: linear-gradient(135deg, #6366f1, #8b5cf6);
+          border-radius: 50%;
+          display: inline-block;
+          animation: bounce 0.6s infinite alternate;
+        }
+        .dot-bounce span:nth-child(2) { animation-delay: 0.2s; }
+        .dot-bounce span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes bounce {
+          from { transform: translateY(0); opacity: 0.6; }
+          to { transform: translateY(-14px); opacity: 1; }
+        }
+      `}
+    </style>
+  </div>
+) : currentRooms.length === 0 ? (
+  // 👉 Trường hợp không có dữ liệu
+  <div style={styles.emptyState}>
+    <p>Không có phòng nào để hiển thị</p>
+  </div>
+) : (
+  // 👉 Bảng phòng khi đã load xong
+  <div style={styles.tableWrapper}>
+    <table style={styles.table}>
+      <thead>
+        <tr>
+          <th style={styles.th}>ID</th>
+          <th style={styles.th}>Image</th>
+          <th style={styles.th}>Address</th>
+          <th style={styles.th}>Type</th>
+          <th style={styles.th}>Price / Month</th>
+          <th style={styles.th}>Acreage</th>
+          <th style={styles.th}>Status</th>
+          <th style={styles.th}>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {currentRooms.map((room, i) => (
+          <tr
+            key={room._id || i}
+            style={i % 2 === 0 ? styles.zebra : {}}
+            className="row-hover"
+            onClick={(e) => {
+              if (
+                e.target.tagName.toLowerCase() !== "button" &&
+                e.target.tagName.toLowerCase() !== "svg" &&
+                e.target.tagName.toLowerCase() !== "path"
+              ) {
+                navigate(`/admin/room/${room._id}`);
+              }
+            }}
+          >
+            <td style={styles.td}>{indexOfFirst + i + 1}</td>
+
+            {/* Ảnh */}
+            <td style={{ ...styles.td, textAlign: "center" }}>
+              {room.images && room.images.length > 0 ? (
+                <img
+                  src={room.images[0].url}
+                  alt="room"
+                  style={{
+                    width: "80px",
+                    height: "60px",
+                    objectFit: "cover",
+                    borderRadius: "8px",
+                  }}
+                />
+              ) : (
+                <span style={{ color: "#9ca3af", fontSize: "12px" }}>
+                  Không có ảnh
+                </span>
+              )}
+            </td>
+
+            <td style={styles.td}>{room.address}</td>
+            <td style={styles.td}>{room.type}</td>
+
+            <td style={styles.td}>
+              {room.price
+                ? `${Number(room.price).toLocaleString()} VND`
+                : "—"}
+              {room.commission_percent ? (
+                <span
+                  className="commission-badge"
+                  data-tooltip={`${(
+                    (room.price * room.commission_percent) /
+                    100
+                  ).toLocaleString()} VND`}
+                >
+                  {room.commission_percent}%
+                </span>
+              ) : null}
+            </td>
+
+            <td style={styles.td}>
+              {room.area ? `${room.area} m²` : "—"}
+            </td>
+
+            <td style={styles.td}>
+              <span
+                style={{
+                  ...styles.status,
+                  ...(room.status === "Còn trống"
+                    ? styles.available
+                    : room.status === "Đã thuê"
+                    ? styles.rented
+                    : styles.maintenance),
+                }}
+              >
+                {room.status}
+              </span>
+            </td>
+
+            <td style={styles.td}>
+              <div style={styles.actions}>
+                {/* Nút edit */}
+                <button
+                  style={styles.editBtn}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    setEditingRoom(room);
+
+                    // Gán dữ liệu cũ vào form
+                    setForm({
+                      apartmentName: room.apartmentName || "",
+                      detailAddress: room.detailAddress || "",
+                      type: room.type || "phòng trọ",
+                      price: room.price
+                        ? room.price.toLocaleString("vi-VN")
+                        : "",
+                      area: room.area || "",
+                      commission_percent: room.commission_percent || "",
+                      status: room.status || "Còn trống",
+                      description: room.description || "",
+                      floor: room.floor || 1,
+                      numberOfRooms: room.numberOfRooms || 1,
+                      utilities:
+                        room.utilities || {
+                          electricity: "",
+                          water: "",
+                          internet: "",
+                          service: "",
+                        },
+                      commonAmenities:
+                        room.commonAmenities || {
+                          camera: false,
+                          smartLock: false,
+                          fireAlarm: false,
+                          privateToilet: false,
+                          washingArea: false,
+                          parking: false,
+                          staircase: false,
+                          elevator: false,
+                          fireExtinguisher: false,
+                        },
+                      province: room.province || { code: "", name: "" },
+                      district: room.district || { code: "", name: "" },
+                      ward: room.ward || { code: "", name: "" },
+                    });
+
+                    // Preview ảnh
+                    setPreviews(room.images?.map((img) => img.url) || []);
+                    setImages([]);
+
+                    // Load lại districts + wards
+                    try {
+                      if (room.province?.code) {
+                        const dists = await getDistricts(room.province.code);
+                        setDistricts(dists);
+                      }
+                      if (room.district?.code) {
+                        const ws = await getWards(room.district.code);
+                        setWards(ws);
+                      }
+                    } catch (err) {
+                      console.error("❌ Lỗi load địa chỉ khi edit:", err);
+                    }
+
+                    setShowModal(true);
+                  }}
+                >
+                  <FontAwesomeIcon icon={faPenToSquare} />
+                </button>
+
+                {/* Nút delete */}
+                <button
+                  style={styles.deleteBtn}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    const result = await Swal.fire({
+                      title: "Bạn có chắc chắn?",
+                      text: "Bạn có muốn xóa phòng này không",
+                      icon: "warning",
+                      showCancelButton: true,
+                      confirmButtonColor: "#4f46e5",
+                      cancelButtonColor: "#6b7280",
+                      confirmButtonText: "Xóa",
+                      cancelButtonText: "Hủy",
+                    });
+                    if (result.isConfirmed) {
+                      try {
+                        await deleteRoom(room._id);
+                        setRooms((prev) =>
+                          prev.filter((r) => r._id !== room._id)
+                        );
+                        Swal.fire({
+                          icon: "success",
+                          title: "Đã xóa!",
+                          text: "Phòng đã được xóa thành công.",
+                          timer: 2000,
+                          showConfirmButton: false,
+                        });
+                      } catch (err) {
+                        console.error("❌ Lỗi khi xóa:", err);
+                        Swal.fire(
+                          "Lỗi!",
+                          "Không thể xóa phòng này.",
+                          "error"
+                        );
+                      }
                     }
                   }}
                 >
-                  <td style={styles.td}>{indexOfFirst + i + 1}</td>
-
-                  {/* Ảnh */}
-                  <td style={{ ...styles.td, textAlign: "center" }}>
-                    {room.images && room.images.length > 0 ? (
-                      <img
-                        src={room.images[0].url}
-                        alt="room"
-                        style={{
-                          width: "80px",
-                          height: "60px",
-                          objectFit: "cover",
-                          borderRadius: "8px",
-                        }}
-                      />
-                    ) : (
-                      <span style={{ color: "#9ca3af", fontSize: "12px" }}>
-                        Không có ảnh
-                      </span>
-                    )}
-                  </td>
-
-                  <td style={styles.td}>{room.address}</td>
-                  <td style={styles.td}>{room.type}</td>
-
-                  <td style={styles.td}>
-                    {room.price ? `${Number(room.price).toLocaleString()} VND` : "—"}
-                    {room.commission_percent ? (
-                      <span
-                        className="commission-badge"
-                        data-tooltip={`${(
-                          (room.price * room.commission_percent) /
-                          100
-                        ).toLocaleString()} VND`}
-                      >
-                        {room.commission_percent}%
-                      </span>
-                    ) : null}
-                  </td>
-
-                  <td style={styles.td}>{room.area ? `${room.area} m²` : "—"}</td>
-
-                  <td style={styles.td}>
-                    <span
-                      style={{
-                        ...styles.status,
-                        ...(room.status === "Còn trống"
-                          ? styles.available
-                          : room.status === "Đã thuê"
-                          ? styles.rented
-                          : styles.maintenance),
-                      }}
-                    >
-                      {room.status}
-                    </span>
-                  </td>
-
-                  <td style={styles.td}>
-                    <div style={styles.actions}>
-                      <button
-  style={styles.editBtn}
-  onClick={async (e) => {
-  e.stopPropagation();
-  setEditingRoom(room); // lưu phòng đang sửa
-
-  // ✅ Gán lại dữ liệu cho form (giữ nguyên giá trị cũ nếu có)
-  setForm({
-    apartmentName: room.apartmentName || "",
-    detailAddress: room.detailAddress || "",
-    type: room.type || "phòng trọ",
-    price: room.price ? room.price.toLocaleString("vi-VN") : "",
-    area: room.area || "",
-    commission_percent: room.commission_percent || "",
-    status: room.status || "Còn trống",
-    description: room.description || "",
-    floor: room.floor || 1,
-    numberOfRooms: room.numberOfRooms || 1,
-    utilities: room.utilities || { electricity: "", water: "", internet: "", service: "" },
-    commonAmenities: room.commonAmenities || {
-      camera: false,
-      smartLock: false,
-      fireAlarm: false,
-      privateToilet: false,
-      washingArea: false,
-      parking: false,
-      staircase: false,
-      elevator: false,
-      fireExtinguisher: false,
-    },
-    province: room.province || { code: "", name: "" },
-    district: room.district || { code: "", name: "" },
-    ward: room.ward || { code: "", name: "" },
-  });
-
-  // ✅ Preview ảnh
-  setPreviews(room.images?.map((img) => img.url) || []);
-  setImages([]);
-
-  // ✅ Load lại districts + wards theo dữ liệu cũ
-  try {
-    if (room.province?.code) {
-      const dists = await getDistricts(room.province.code);
-      setDistricts(dists);
-    }
-    if (room.district?.code) {
-      const ws = await getWards(room.district.code);
-      setWards(ws);
-    }
-  } catch (err) {
-    console.error("❌ Lỗi load địa chỉ khi edit:", err);
-  }
-
-  setShowModal(true);
-}}
-
->
-  <FontAwesomeIcon icon={faPenToSquare} />
-</button>
+                  <FontAwesomeIcon icon={faTrash} />
+                </button>
+              </div>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+)}
 
 
-                      <button
-                        style={styles.deleteBtn}
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          const result = await Swal.fire({
-                            title: "Bạn có chắc chắn?",
-                            text: "Bạn có muốn xóa phòng này không",
-                            icon: "warning",
-                            showCancelButton: true,
-                            confirmButtonColor: "#4f46e5",
-                            cancelButtonColor: "#6b7280",
-                            confirmButtonText: "Xóa",
-                            cancelButtonText: "Hủy",
-                          });
-                          if (result.isConfirmed) {
-                            try {
-                              await deleteRoom(room._id);
-                              setRooms((prev) => prev.filter((r) => r._id !== room._id));
-                              Swal.fire({
-                                icon: "success",
-                                title: "Đã xóa!",
-                                text: "Phòng đã được xóa thành công.",
-                                timer: 2000,
-                                showConfirmButton: false,
-                              });
-                            } catch (err) {
-                              console.error("❌ Lỗi khi xóa:", err);
-                              Swal.fire("Lỗi!", "Không thể xóa phòng này.", "error");
-                            }
-                          }
-                        }}
-                      >
-                        <FontAwesomeIcon icon={faTrash} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+</div>
+
 
         {/* Pagination */}
-        <div className="pagination">
-          <button onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))} disabled={currentPage === 1}>
-            «
-          </button>
-          {Array.from({ length: totalPages }, (_, idx) => (
-            <button
-              key={idx + 1}
-              className={currentPage === idx + 1 ? "active" : ""}
-              onClick={() => setCurrentPage(idx + 1)}
-            >
-              {idx + 1}
-            </button>
-          ))}
-          <button
-            onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-            disabled={currentPage === totalPages}
-          >
-            »
-          </button>
-        </div>
+       {/* Pagination */}
+{!loading && totalPages > 1 && (
+  <div className="pagination">
+    <button 
+      onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))} 
+      disabled={currentPage === 1}
+    >
+      «
+    </button>
+    {Array.from({ length: totalPages }, (_, idx) => (
+      <button
+        key={idx + 1}
+        className={currentPage === idx + 1 ? "active" : ""}
+        onClick={() => setCurrentPage(idx + 1)}
+      >
+        {idx + 1}
+      </button>
+    ))}
+    <button
+      onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+      disabled={currentPage === totalPages}
+    >
+      »
+    </button>
+  </div>
+)}
+
       </div>
 
       {/* Modal */}
@@ -1063,6 +1138,30 @@ const styles = {
     cursor: "pointer",
     color: "#dc2626",
   },
+  loadingWrapper: {
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "center",
+  alignItems: "center",
+  minHeight: "60vh",   // 👈 chiếm 60% chiều cao viewport
+  width: "100%",
+  textAlign: "center",
+  gap: "14px",
+},
+loadingText: {
+  fontSize: "16px",
+  fontWeight: "600",
+  color: "#4f46e5",
+},
+emptyState: {
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  minHeight: "40vh",
+  fontSize: "16px",
+  fontWeight: "500",
+  color: "#6b7280",
+},
   
 };
 
@@ -1245,6 +1344,16 @@ textarea { resize: none; min-height: 80px; }
 .pagination button:hover{ background:#f3e8ff; }
 .pagination button.active{ background:#7c3aed; color:#fff; }
 .pagination button:disabled{ opacity:.5; cursor:not-allowed; }
+.loadingContainer: {
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "center",
+  alignItems: "center",
+  minHeight: "220px",
+  gap: "16px",
+},
+
+
 
 /* Animations */
 @keyframes fadeIn { from{opacity:0} to{opacity:1} }

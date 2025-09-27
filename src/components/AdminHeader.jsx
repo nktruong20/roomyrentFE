@@ -1,174 +1,80 @@
-import React, { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import React, { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUserPlus, faUser } from "@fortawesome/free-solid-svg-icons";
-import Swal from "sweetalert2";
-import { logout, getMe } from "../services/authService";
+import { faBell } from "@fortawesome/free-solid-svg-icons";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function AdminHeader() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const [open, setOpen] = useState(false);
 
-  // ✅ Lấy user từ token
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const data = await getMe();
-        setUser(data);
-      } catch (err) {
-        console.error("Lỗi khi lấy user:", err);
-        Swal.fire("Bạn chưa đăng nhập", "Vui lòng đăng nhập lại", "warning").then(
-          () => navigate("/login")
-        );
-      }
-    };
-    fetchUser();
-  }, [navigate]);
-
-  // ✅ Menu
-  const navItems = [
-    { path: "/admin/dashboard", label: "Hệ thống quản lý", roles: ["boss"] },
-    { path: "/admin/room", label: "Quản lý phòng", roles: ["boss", "assistant", "admin"] },
-    { path: "/admin/schedules", label: "Quản lý lịch đặt phòng", roles: ["boss"] },
-    { path: "/admin/staff", label: "Danh sách nhân sự", roles: ["boss", "assistant", "admin"] },
-    { path: "/admin/transactions", label: "Giao dịch", roles: ["boss"] },
-    { path: "/admin/my-schedules", label: "Lịch hẹn tư vấn xem nhà", roles: ["admin", "assistant"] },
+  const notifications = [
+    { id: 1, message: "Có người dùng mới đăng ký.", time: "2 phút trước" },
+    { id: 2, message: "Phòng 203 vừa được đặt.", time: "10 phút trước" },
+    { id: 3, message: "Admin đã cập nhật hệ thống.", time: "1 giờ trước" },
   ];
-
-  if (!user) return null;
 
   return (
     <header className="admin-header">
-      <Link to="/" className="logo">
-      RoomyRent Admin
-    </Link>
-
-      <nav>
-        {navItems
-          .filter((item) => item.roles.includes(user.role))
-          .map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={location.pathname === item.path ? "active" : ""}
-            >
-              {item.label}
-            </Link>
-          ))}
-      </nav>
+      <h2>Trang quản trị</h2>
 
       <div className="header-right">
-        {/* boss mới thấy tạo tài khoản */}
-        {user.role === "boss" && (
-          <button
-            className="create-btn"
-            onClick={() => navigate("/admin/registermanage")}
-          >
-            <FontAwesomeIcon icon={faUserPlus} style={{ marginRight: "8px" }} />
-            Tạo tài khoản
-          </button>
-        )}
-
-        {/* ✅ Icon user */}
-        <button
-          className="avatar-btn"
-          onClick={() => navigate("/admin/administratorprofile")}
+        <motion.div
+          className="notification-bell"
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setOpen(!open)}
         >
-          <FontAwesomeIcon icon={faUser} size="lg" />
-        </button>
+          <FontAwesomeIcon icon={faBell} />
+          {notifications.length > 0 && <span className="badge">{notifications.length}</span>}
+        </motion.div>
+
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="dropdown"
+            >
+              {notifications.map((n) => (
+                <div key={n.id} className="dropdown-item">
+                  <p>{n.message}</p>
+                  <span>{n.time}</span>
+                </div>
+              ))}
+              {notifications.length === 0 && <p className="empty">Không có thông báo</p>}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      <style>{`
-        .admin-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 14px 30px;
-          background: #111827;
-          color: white;
-          font-family: "Inter", sans-serif;
-          position: sticky;
-          top: 0;
-          z-index: 100;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-        }
-
-        .logo {
-          font-size: 22px;
-          font-weight: 700;
-          background: linear-gradient(90deg, #6366f1, #a855f7);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-        }
-
-        nav {
-          display: flex;
-          gap: 20px;
-        }
-
-        nav a {
-          padding: 6px 14px;
-          border-radius: 20px;
-          text-decoration: none;
-          font-weight: 500;
-          color: #d1d5db;
-          transition: all 0.25s ease;
-        }
-
-        nav a:hover {
-          color: #a78bfa;
-        }
-
-        nav a.active {
-          background: rgba(99,102,241,0.15);
-          color: #a78bfa;
-          font-weight: 600;
-        }
-
-        .header-right {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .create-btn {
-          background: #6366f1;
-          border: none;
-          padding: 8px 16px;
-          border-radius: 10px;
-          color: white;
-          cursor: pointer;
-          font-weight: 600;
-          font-size: 14px;
-          transition: all 0.3s ease;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-        }
-
-        .create-btn:hover {
-          background: #4f46e5;
-          transform: scale(1.05);
-        }
-
-        .avatar-btn {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 50%;
-          width: 40px;
-          height: 40px;
-          background: rgba(99,102,241,0.2);
-          border: 2px solid #6366f1;
-          color: #a78bfa;
-          cursor: pointer;
-          transition: all 0.3s ease;
-        }
-
-        .avatar-btn:hover {
-          background: rgba(99,102,241,0.3);
-          transform: scale(1.05);
-        }
-      `}</style>
+      <style>{css}</style>
     </header>
   );
 }
+
+const css = `
+.admin-header {
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.admin-header h2 { font-size: 18px; font-weight: 600; color: #111; }
+.header-right { display: flex; align-items: center; gap: 16px; position: relative; }
+.notification-bell { position: relative; font-size: 20px; cursor: pointer; color: #111; }
+.badge { position: absolute; top: -6px; right: -8px; background: #ef4444; color: white; font-size: 12px; padding: 2px 6px; border-radius: 50%; }
+.dropdown {
+  position: absolute; top: 36px; right: 0; width: 260px; background: #fff;
+  border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.dropdown-item { padding: 10px 14px; border-bottom: 1px solid #f3f4f6; }
+.dropdown-item:last-child { border-bottom: none; }
+.dropdown-item p { margin: 0; font-size: 14px; color: #111; }
+.dropdown-item span { font-size: 12px; color: #6b7280; }
+.empty { padding: 14px; text-align: center; color: #6b7280; }
+`;

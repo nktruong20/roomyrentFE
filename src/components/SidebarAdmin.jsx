@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate, Outlet } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -12,7 +13,8 @@ import {
   faArrowRightFromBracket,
   faBars,
   faChevronLeft,
-  faClipboardList, // icon cho AssignmentSchedule
+  faClipboardList,
+  faUserShield, // icon logo admin
 } from "@fortawesome/free-solid-svg-icons";
 import Swal from "sweetalert2";
 import { logout, getMe } from "../services/authService";
@@ -42,7 +44,7 @@ export default function AdminLayout() {
     { path: "/admin/dashboard", label: "Hệ thống quản lý", icon: faChartLine, roles: ["boss"] },
     { path: "/admin/room", label: "Quản lý phòng", icon: faBuilding, roles: ["boss", "assistant", "admin"] },
     { path: "/admin/schedules", label: "Quản lý đặt phòng", icon: faCalendarAlt, roles: ["boss"] },
-    { path: "/admin/my-schedules", label: "Lịch hẹn xem phòng", icon: faClipboardList, roles: ["assistant", "admin"] }, // ✅ thêm cho assistant, admin
+    { path: "/admin/my-schedules", label: "Lịch hẹn xem phòng", icon: faClipboardList, roles: ["assistant", "admin"] },
     { path: "/admin/staff", label: "Danh sách nhân sự", icon: faUsers, roles: ["boss", "assistant", "admin"] },
     { path: "/admin/administratorprofile", label: "Hồ sơ quản trị", icon: faUser, roles: ["boss","assistant","admin"] },
   ];
@@ -57,7 +59,7 @@ export default function AdminLayout() {
       showCancelButton: true,
       confirmButtonText: "Đăng xuất",
       cancelButtonText: "Hủy",
-      confirmButtonColor: "#ef4444",
+      confirmButtonColor: "#000",
     });
     if (res.isConfirmed) {
       await logout();
@@ -70,11 +72,20 @@ export default function AdminLayout() {
       {/* Sidebar */}
       <motion.aside
         animate={{ width: collapsed ? 80 : 240 }}
-        transition={{ duration: 0.3 }}
+        transition={{ duration: 0.4 }}
         className="sidebar"
       >
         <div className="top">
-          {!collapsed && <div className="logo">RoomyRent Admin</div>}
+          {!collapsed && (
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }} 
+              animate={{ opacity: 1, x: 0 }} 
+              className="logo"
+            >
+              <FontAwesomeIcon icon={faUserShield} className="logo-icon"/>
+              <span>Admin Panel</span>
+            </motion.div>
+          )}
           <button className="collapse-btn" onClick={() => setCollapsed(!collapsed)}>
             <FontAwesomeIcon icon={collapsed ? faBars : faChevronLeft} />
           </button>
@@ -109,6 +120,7 @@ export default function AdminLayout() {
         <div className="sidebar-bottom">
           {user.role === "boss" && (
             <motion.button
+              whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               className="create-btn"
               onClick={() => navigate("/admin/registermanage")}
@@ -119,6 +131,7 @@ export default function AdminLayout() {
           )}
 
           <motion.button
+            whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="logout-btn"
             onClick={handleLogout}
@@ -135,7 +148,7 @@ export default function AdminLayout() {
         initial={{ opacity: 0, x: 30 }}
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: -30 }}
-        transition={{ duration: 0.4 }}
+        transition={{ duration: 0.5 }}
         className={`content ${location.pathname === "/admin/registermanage" ? "no-padding" : ""}`}
       >
         <Outlet />
@@ -150,14 +163,15 @@ const css = `
 .admin-layout {
   display: flex;
   height: 100vh;
+  font-family: 'Inter', sans-serif;
 }
 .sidebar {
-  background: linear-gradient(180deg, #0f172a, #1e293b);
+  background: #111; /* sidebar đen */
   color: white;
   display: flex;
   flex-direction: column;
   padding: 16px 8px;
-  box-shadow: 2px 0 12px rgba(0,0,0,0.15);
+  box-shadow: 4px 0 16px rgba(0,0,0,0.4);
   transition: all 0.3s ease;
 }
 .sidebar .top {
@@ -167,29 +181,33 @@ const css = `
   margin-bottom: 20px;
 }
 .logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 18px;
   font-weight: 800;
-  background: linear-gradient(90deg,#3b82f6,#06b6d4);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+}
+.logo-icon {
+  font-size: 22px;
+  color: white;
 }
 .collapse-btn {
   background: transparent;
   border: none;
-  color: #94a3b8;
+  color: #ccc;
   font-size: 18px;
   cursor: pointer;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, color 0.2s ease;
 }
 .collapse-btn:hover {
-  transform: scale(1.15);
+  transform: scale(1.2);
   color: #fff;
 }
 .menu {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 .menu-item {
   display: flex;
@@ -197,19 +215,19 @@ const css = `
   gap: 12px;
   padding: 10px 12px;
   border-radius: 10px;
-  color: #cbd5e1;
+  color: #aaa;
   text-decoration: none;
   font-weight: 500;
-  transition: all 0.25s ease;
+  transition: all 0.3s ease;
 }
 .menu-item:hover {
-  background: rgba(255,255,255,0.08);
-  color: #f1f5f9;
-  transform: translateX(4px);
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  transform: translateX(6px);
 }
 .menu-item.active {
-  background: linear-gradient(90deg,#3b82f6,#06b6d4);
-  color: white;
+  background: white;
+  color: black;
   font-weight: 600;
 }
 .menu-icon { font-size: 16px; }
@@ -231,30 +249,35 @@ const css = `
   transition: all 0.25s ease;
 }
 .create-btn {
-  background: #2563eb;
-  color: white;
+  background: white;
+  color: black;
 }
 .create-btn:hover {
-  background: #1d4ed8;
-  transform: translateY(-1px);
+  background: #e5e5e5;
+  transform: translateY(-2px);
 }
 .logout-btn {
-  background: #dc2626;
+  background: black;
   color: white;
+  border: 1px solid #fff;
 }
 .logout-btn:hover {
-  background: #b91c1c;
-  transform: translateY(-1px);
+  background: #222;
+  transform: translateY(-2px);
 }
 .content {
   flex: 1;
-  background: #f1f5f9;
+  background: #fff; /* main trắng */
+  color: #111;
   overflow-y: auto;
   padding: 24px;
   transition: all 0.4s ease;
 }
 .content.no-padding {
   padding: 0 !important;
-  background: #0b0e1a !important;
+  background: #000 !important;
+  color: white !important;
 }
 `;
+
+

@@ -24,7 +24,7 @@ import AdministratorProfile from "./pages/admin/AdministratorProfile";
 
 // Components
 import PrivateRoute from "./components/PrivateRoute";
-import SidebarAdmin from "./components/SidebarAdmin"; // ✅ thay cho AdminLayout
+import SidebarAdmin from "./components/SidebarAdmin";
 
 function App() {
   const adminRoles = ["boss", "assistant", "admin"];
@@ -48,7 +48,8 @@ function App() {
         <Route path="/rooms/:id" element={<DetailRoom />} />
         <Route path="/profile" element={<Profile />} />
 
-              <Route
+        {/* Admin */}
+        <Route
           path="/admin"
           element={
             <PrivateRoute roles={adminRoles}>

@@ -41,7 +41,7 @@ export default function RoomList() {
 
   const { ref, inView } = useInView({ triggerOnce: true, threshold: 0.2 });
   const navigate = useNavigate();
-  const listRef = useRef(null); // 👉 để scroll xuống danh sách
+  const listRef = useRef(null);
 
   // Rút gọn địa chỉ hiển thị
   const shortAddress = (address) => {
@@ -80,11 +80,12 @@ export default function RoomList() {
     };
     fetchRooms();
   }, []);
-useEffect(() => {
-  window.scrollTo({ top: 600, behavior: "smooth" });
-}, [currentPage]);
 
-  // Lấy danh sách yêu thích khi có user
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [currentPage]);
+
+  // Lấy danh sách yêu thích
   useEffect(() => {
     const fetchFavourites = async () => {
       if (!user) return;
@@ -199,7 +200,7 @@ useEffect(() => {
     setFilters((prev) => ({ ...prev, ...filterValues }));
     setTimeout(() => {
       if (listRef.current) {
-        const yOffset = -120; // 👉 chỉnh khoảng trống stop
+        const yOffset = -120;
         const y =
           listRef.current.getBoundingClientRect().top +
           window.pageYOffset +
@@ -209,14 +210,10 @@ useEffect(() => {
     }, 300);
   };
 
-  if (loading)
-    return <p style={{ padding: "40px" }}>⏳ Đang tải dữ liệu...</p>;
-
   return (
     <div style={{ paddingTop: 80 }}>
       <Header />
       <div style={styles.page}>
-        {/* ✅ Nhận filter từ BannerCarousel */}
         <BannerCarousel onSearch={handleSearch} />
 
         <motion.p
@@ -229,144 +226,169 @@ useEffect(() => {
         </motion.p>
 
         <div ref={listRef} style={styles.grid}>
-          {paginatedRooms.map((room, index) => {
-            const phoneVisible = visiblePhones[room._id];
-            const maskedPhone =
-              room.create_by?.phone?.slice(0, 7) + " ..." || "Ẩn số";
-            const isFav = favourites[room._id];
-            return (
-              <motion.div
-                key={room._id}
-                style={styles.card}
-                onClick={() => navigate(`/rooms/${room._id}`)}
-                initial={{ opacity: 0, y: 40 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                whileHover={{
-                  scale: 1.03,
-                  boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
-                }}
-              >
-                <div style={styles.imageWrapper}>
-                  <img
-                    src={room.images?.[0]?.url}
-                    alt={room.name}
-                    style={styles.image}
-                  />
-                  <div style={styles.priceTag}>
-                    {room.price.toLocaleString()} VND/tháng
-                  </div>
-                </div>
-                <div style={styles.cardBody}>
-                  <div style={styles.nameRow}>
-                    <h3 style={styles.roomName}>
-                      {room.apartmentName || "Không có tên"}
-                    </h3>
-                    {room.commission_percent && (
-                      <span
-                        className="commission-badge"
-                        data-tooltip={`Hoa hồng: ${(
-                          (room.price * room.commission_percent) /
-                          100
-                        ).toLocaleString()} VND`}
-                      >
-                        {room.commission_percent}%
-                      </span>
-                    )}
-                  </div>
+      {loading ? (
+  <div style={styles.loadingContainer}>
+    <div className="dot-bounce">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+    <p style={styles.loadingText}>Đang tải dữ liệu...</p>
+    <style>
+      {`
+        .dot-bounce {
+          display: flex;
+          gap: 8px;
+        }
+        .dot-bounce span {
+          width: 14px;
+          height: 14px;
+          background: #8a5cff;
+          border-radius: 50%;
+          display: inline-block;
+          animation: bounce 0.6s infinite alternate;
+        }
+        .dot-bounce span:nth-child(2) { animation-delay: 0.2s; }
+        .dot-bounce span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce {
+          from { transform: translateY(0); opacity: 0.6; }
+          to { transform: translateY(-12px); opacity: 1; }
+        }
+      `}
+    </style>
+  </div>
+) : (
 
-                  <p style={styles.roomInfo}>
-                    {room.type} • {room.area} m² • {shortAddress(room.address)}
-                  </p>
-
-                  <div style={styles.posterRow}>
-                    <img
-                      src={
-                        room.create_by?.avatar || "https://i.pravatar.cc/50"
-                      }
-                      alt={room.create_by?.name || "Người đăng"}
-                      style={styles.avatar}
-                    />
-                    <div>
-                      <p style={styles.posterName}>
-                        {room.create_by?.name || "Người đăng"}
-                      </p>
-                      <p style={styles.postedTime}>
-                        {new Date(room.createdAt).toLocaleDateString("vi-VN")}
-                      </p>
+            <>
+              {paginatedRooms.map((room, index) => {
+                const phoneVisible = visiblePhones[room._id];
+                const maskedPhone =
+                  room.create_by?.phone?.slice(0, 7) + " ..." || "Ẩn số";
+                const isFav = favourites[room._id];
+                return (
+                  <motion.div
+                    key={room._id}
+                    style={styles.card}
+                    onClick={() => navigate(`/rooms/${room._id}`)}
+                    initial={{ opacity: 0, y: 40 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                    whileHover={{
+                      scale: 1.03,
+                      boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
+                    }}
+                  >
+                    <div style={styles.imageWrapper}>
+                      <img
+                        src={room.images?.[0]?.url}
+                        alt={room.name}
+                        style={styles.image}
+                      />
+                      <div style={styles.priceTag}>
+                        {room.price.toLocaleString()} VND/tháng
+                      </div>
                     </div>
-                  </div>
-                  <div style={styles.actionRow}>
-                    <button
-                      style={styles.phoneBtn}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        togglePhone(room._id, room.create_by?.phone);
-                      }}
-                    >
-                      <FontAwesomeIcon
-                        icon={faPhone}
-                        style={{ marginRight: "6px" }}
-                      />
-                      {phoneVisible
-                        ? room.create_by?.phone || "Chưa có"
-                        : maskedPhone}
-                    </button>
-                    <button
-                      style={styles.favoriteBtn}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleFavourite(room._id);
-                      }}
-                    >
-                      <FontAwesomeIcon
-                        icon={faHeart}
-                        style={{ color: isFav ? "red" : "#ccc" }}
-                      />
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
+                    <div style={styles.cardBody}>
+                      <div style={styles.nameRow}>
+                        <h3 style={styles.roomName}>
+                          {room.apartmentName || "Không có tên"}
+                        </h3>
+                        {room.commission_percent && (
+                          <span
+                            className="commission-badge"
+                            data-tooltip={`Hoa hồng: ${(
+                              (room.price * room.commission_percent) /
+                              100
+                            ).toLocaleString()} VND`}
+                          >
+                            {room.commission_percent}%
+                          </span>
+                        )}
+                      </div>
 
-          {/* Không tìm thấy phòng */}
-          {filteredRooms.length === 0 && (
-            <motion.div
-              style={{
-                gridColumn: "1 / -1",
-                textAlign: "center",
-                padding: "60px 20px",
-                background: "#f9fafb",
-                borderRadius: "12px",
-                boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
-              }}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.6 }}
-            >
-              <div
-                style={{
-                  border: "6px solid #f3f3f3",
-                  borderTop: "6px solid #8a5cff",
-                  borderRadius: "50%",
-                  width: "50px",
-                  height: "50px",
-                  margin: "0 auto 20px",
-                  animation: "spin 1s linear infinite",
-                }}
-              />
-              <h3 style={{ fontSize: "20px", fontWeight: "700", color: "#111" }}>
-                Không tìm thấy phòng nào phù hợp
-              </h3>
-              <p style={{ fontSize: "15px", color: "#555", marginTop: "8px" }}>
-                Bạn có thể thử thay đổi bộ lọc hoặc tìm kiếm với lựa chọn khác!
-              </p>
-            </motion.div>
+                      <p style={styles.roomInfo}>
+                        {room.type} • {room.area} m² • {shortAddress(room.address)}
+                      </p>
+
+                      <div style={styles.posterRow}>
+                        <img
+                          src={room.create_by?.avatar || "https://i.pravatar.cc/50"}
+                          alt={room.create_by?.name || "Người đăng"}
+                          style={styles.avatar}
+                        />
+                        <div>
+                          <p style={styles.posterName}>
+                            {room.create_by?.name || "Người đăng"}
+                          </p>
+                          <p style={styles.postedTime}>
+                            {new Date(room.createdAt).toLocaleDateString("vi-VN")}
+                          </p>
+                        </div>
+                      </div>
+                      <div style={styles.actionRow}>
+                        <button
+                          style={styles.phoneBtn}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            togglePhone(room._id, room.create_by?.phone);
+                          }}
+                        >
+                          <FontAwesomeIcon
+                            icon={faPhone}
+                            style={{ marginRight: "6px" }}
+                          />
+                          {phoneVisible
+                            ? room.create_by?.phone || "Chưa có"
+                            : maskedPhone}
+                        </button>
+                        <button
+                          style={styles.favoriteBtn}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavourite(room._id);
+                          }}
+                        >
+                          <FontAwesomeIcon
+                            icon={faHeart}
+                            style={{ color: isFav ? "red" : "#ccc" }}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+
+             {filteredRooms.length === 0 && !loading && (
+  <motion.div
+    style={{
+      gridColumn: "1 / -1",
+      textAlign: "center",
+      padding: "60px 20px",
+      background: "#fff",
+      borderRadius: "12px",
+      boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
+    }}
+    initial={{ opacity: 0, scale: 0.9 }}
+    animate={{ opacity: 1, scale: 1 }}
+    transition={{ duration: 0.6 }}
+  >
+    {/* ❌ Bỏ sniper xoay đi, thay bằng icon trống */}
+    <div style={{ fontSize: "50px", marginBottom: "16px" }}>🏠</div>
+
+    <h3 style={{ fontSize: "20px", fontWeight: "700", color: "#111" }}>
+      Không tìm thấy phòng nào phù hợp
+    </h3>
+    <p style={{ fontSize: "15px", color: "#555", marginTop: "8px" }}>
+      Bạn có thể thử thay đổi bộ lọc hoặc tìm kiếm với lựa chọn khác!
+    </p>
+  </motion.div>
+)}
+
+            </>
           )}
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <motion.div
             style={styles.pagination}
@@ -411,12 +433,11 @@ useEffect(() => {
           animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
           transition={{ duration: 0.8, ease: "easeOut" }}
         >
-          <StudentRoom />
+          {/* <StudentRoom /> */}
         </motion.div>
       </div>
       <Footer />
 
-      {/* Spinner CSS */}
       <style>
         {`
           @keyframes spin {
@@ -428,6 +449,7 @@ useEffect(() => {
     </div>
   );
 }
+
 
 const styles = {
   page: {
@@ -694,7 +716,22 @@ const styles = {
     opacity: 1,
     transform: "translateX(-50%) translateY(-4px)",
   },
-  
+  loadingContainer: {
+  gridColumn: "1 / -1",
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "center",
+  alignItems: "center",
+  minHeight: "50vh", // loader ra giữa
+  gap: "16px",
+},
+loadingText: {
+  fontSize: "16px",
+  fontWeight: "600",
+  color: "#555",
+},
+
+
   
 };
 const style = document.createElement("style");

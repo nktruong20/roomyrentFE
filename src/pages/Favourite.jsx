@@ -171,19 +171,39 @@ export default function Favourite() {
       <section style={styles.section}>
         {/* Loading skeleton */}
         {loading && (
-          <div style={styles.grid}>
-            {Array.from({ length: PER_PAGE }).map((_, i) => (
-              <div key={i} style={styles.skeletonCard}>
-                <div style={styles.skeletonImg} />
-                <div style={{ padding: 16 }}>
-                  <div style={styles.skeletonLine} />
-                  <div style={{ ...styles.skeletonLine, width: "60%" }} />
-                  <div style={{ ...styles.skeletonLine, width: "40%" }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+  <div style={styles.loadingContainer}>
+    <div className="dot-bounce">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+    <p style={styles.loadingText}>Đang tải dữ liệu...</p>
+
+    <style>
+      {`
+        .dot-bounce {
+          display: flex;
+          gap: 8px;
+        }
+        .dot-bounce span {
+          width: 14px;
+          height: 14px;
+          background: #8a5cff;
+          border-radius: 50%;
+          display: inline-block;
+          animation: bounce 0.6s infinite alternate;
+        }
+        .dot-bounce span:nth-child(2) { animation-delay: 0.2s; }
+        .dot-bounce span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce {
+          from { transform: translateY(0); opacity: 0.6; }
+          to { transform: translateY(-12px); opacity: 1; }
+        }
+      `}
+    </style>
+  </div>
+)}
+
 
         {/* Empty state */}
         {!loading && favourites.length === 0 && (
@@ -235,10 +255,6 @@ export default function Favourite() {
                     {/* Content */}
                     <div style={styles.cardContent}>
                       <h3 style={styles.cardTitle}>{roomTitle(fav)}</h3>
-                      {/* <p style={styles.meta}>
-                        <FaDollarSign />{" "}
-                        <b>{roomPrice(fav).toLocaleString("vi-VN")} VND/tháng</b>
-                      </p> */}
                       <p style={styles.meta}>
                         <FaMapMarkerAlt /> {roomAddr(fav)}
                       </p>
@@ -517,6 +533,20 @@ const styles = {
     boxShadow: "0 6px 16px rgba(124,58,237,.35)",
   },
   pageInfo: { marginTop: 8, fontSize: 13, color: "#6b7280" },
+  loadingContainer: {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  minHeight: "40vh",
+  gap: "16px",
+},
+loadingText: {
+  fontSize: "16px",
+  fontWeight: "600",
+  color: "#555",
+},
+
 };
 
 // keyframes
